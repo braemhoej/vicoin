@@ -6,18 +6,18 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	node "vicoin/internal/network"
+	"vicoin/internal/network"
 )
 
 func TCPToStrings(addr *net.TCPAddr) (ip string, port string) {
 	return "[" + addr.IP.String() + "]", strconv.Itoa(addr.Port)
 }
 
-func TestNodesCanEstablishConnections(t *testing.T) {
+func TestInterfaceCanEstablishConnections(t *testing.T) {
 	c1 := make(chan []byte)
 	c2 := make(chan []byte)
-	n1 := node.NewNode(c1)
-	n2 := node.NewNode(c2)
+	n1 := network.New(c1)
+	n2 := network.New(c2)
 	_, err := n2.Connect(TCPToStrings(n1.Addr))
 	time.Sleep(5 * time.Millisecond)
 	if err != nil {
@@ -35,9 +35,9 @@ func TestBroadcastMessagesAreSentToAllConnections(t *testing.T) {
 	c1 := make(chan []byte)
 	c2 := make(chan []byte)
 	c3 := make(chan []byte)
-	n1 := node.NewNode(c1)
-	n2 := node.NewNode(c2)
-	n3 := node.NewNode(c3)
+	n1 := network.New(c1)
+	n2 := network.New(c2)
+	n3 := network.New(c3)
 	_, err1 := n2.Connect(TCPToStrings(n1.Addr))
 	_, err2 := n3.Connect(TCPToStrings(n1.Addr))
 	time.Sleep(5 * time.Millisecond)
