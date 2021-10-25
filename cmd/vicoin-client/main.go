@@ -1,1 +1,1 @@
-package vicoinclient
+package main
