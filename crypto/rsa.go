@@ -1,12 +1,11 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/gob"
 	"math/big"
 	"reflect"
+	"vicoin/encoding"
 )
 
 var one = big.NewInt(1)
@@ -37,7 +36,7 @@ func KeyGen(bits int) (*PublicKey, *PrivateKey, error) {
 }
 
 func Encrypt(object interface{}, publicKey *PublicKey) ([]byte, error) {
-	serializedObject, err := serialize(object)
+	serializedObject, err := encoding.Serialize(object)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +47,7 @@ func Encrypt(object interface{}, publicKey *PublicKey) ([]byte, error) {
 func Decrypt(bytes []byte, privateKey *PrivateKey) (interface{}, error) {
 	cipher := new(big.Int).SetBytes(bytes)
 	plain := new(big.Int).Exp(cipher, privateKey.D, privateKey.N).Bytes()
-	object, err := deserialize(plain)
+	object, err := encoding.Deserialize(plain)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +55,7 @@ func Decrypt(bytes []byte, privateKey *PrivateKey) (interface{}, error) {
 }
 
 func Sign(object interface{}, privateKey *PrivateKey) ([]byte, error) {
-	serializedObject, err := serialize(object)
+	serializedObject, err := encoding.Serialize(object)
 	if err != nil {
 		return nil, err
 	}
@@ -69,30 +68,10 @@ func Validate(object interface{}, signature []byte, public *PublicKey) (bool, er
 	if err1 != nil {
 		return false, err1
 	}
-	serializedObject, err2 := serialize(object)
+	serializedObject, err2 := encoding.Serialize(object)
 	if err2 != nil {
 		return false, err2
 	}
 	hash := sha256.Sum256(serializedObject)
 	return reflect.DeepEqual(decryptedSignature, hash[:]), nil
-}
-
-func serialize(object interface{}) ([]byte, error) {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(&object)
-	if err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
-}
-func deserialize(data []byte) (interface{}, error) {
-	buffer := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buffer)
-	var object interface{}
-	err := dec.Decode(&object)
-	if err != nil {
-		return nil, err
-	}
-	return object, nil
 }
