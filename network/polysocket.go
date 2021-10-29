@@ -2,6 +2,7 @@ package network
 
 import (
 	"encoding/gob"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -38,8 +39,9 @@ func NewPolysocket(internal chan interface{}) (polysocket *Polysocket, err error
 	return polysocket, err
 }
 
-func (polysocket *Polysocket) Connect(ip string, port string) (net.Conn, error) {
-	socket, err := net.Dial("tcp", ip+":"+port)
+func (polysocket *Polysocket) Connect(addr *net.TCPAddr) (net.Conn, error) {
+	local, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+	socket, err := net.DialTCP("tcp", local, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,8 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 	defer polysocket.lock.Unlock()
 	var errors []error
 	for _, socket := range polysocket.connections {
-		err := polysocket.Send(data, socket)
+		enc := gob.NewEncoder(socket)
+		err := enc.Encode(&data)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -77,7 +80,12 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 	return errors
 }
 
-func (polysocket *Polysocket) Send(data interface{}, socket net.Conn) error {
+func (polysocket *Polysocket) Send(data interface{}, addr net.TCPAddr) error {
+	polysocket.lock.Lock()
+	defer polysocket.lock.Unlock()
+	fmt.Print("Address: " + addr.String())
+	socket := polysocket.connections[addr.String()]
+	fmt.Print(socket)
 	enc := gob.NewEncoder(socket)
 	err := enc.Encode(&data)
 	if err != nil {

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"net"
 	"testing"
 	"time"
 	"vicoin/network"
@@ -25,7 +26,7 @@ func TestPolysocketsAddConnectionsToListUponConnection(t *testing.T) {
 	if err1 != nil || err2 != nil {
 		t.Error("Error creating polysocket: ", err1, err2)
 	}
-	_, err := i2.Connect(network.TCP2Strings(i1.GetAddr()))
+	_, err := i2.Connect(i1.GetAddr())
 	if err != nil {
 		t.Error("Error creating polysocket: ", err1, err2)
 	}
@@ -42,7 +43,7 @@ func TestPolysocketsRemoveConnectionsFromListUponDisconnection(t *testing.T) {
 	c2 := make(chan interface{})
 	i1, _ := network.NewPolysocket(c1)
 	i2, _ := network.NewPolysocket(c2)
-	i2.Connect(network.TCP2Strings(i1.GetAddr()))
+	i2.Connect(i1.GetAddr())
 	time.Sleep(5 * time.Millisecond) // Give the nodes a chance to update connection list.
 	i2.Close()
 	time.Sleep(5 * time.Millisecond) // Give the nodes a chance to update connection list.
@@ -57,8 +58,8 @@ func TestPolysocketsBroadcastToAllConnections(t *testing.T) {
 	i1, _ := network.NewPolysocket(c1)
 	i2, _ := network.NewPolysocket(c2)
 	i3, _ := network.NewPolysocket(c3)
-	i2.Connect(network.TCP2Strings(i1.GetAddr()))
-	i3.Connect(network.TCP2Strings(i1.GetAddr()))
+	i2.Connect(i1.GetAddr())
+	i3.Connect(i1.GetAddr())
 	sent := "lorem ipsum"
 	time.Sleep(50 * time.Millisecond)
 	i1.Broadcast(sent)
@@ -78,17 +79,19 @@ func TestPolysocketsSendsOnlyToTarget(t *testing.T) {
 	i1, _ := network.NewPolysocket(c1)
 	i2, _ := network.NewPolysocket(c2)
 	i3, _ := network.NewPolysocket(c3)
-	i2.Connect(network.TCP2Strings(i1.GetAddr()))
-	i3.Connect(network.TCP2Strings(i1.GetAddr()))
+	conn2, _ := i2.Connect(i1.GetAddr())
+	conn3, _ := i3.Connect(i1.GetAddr())
 	sent := "lorem ipsum"
+	secret := "ipsum lorem"
 	time.Sleep(50 * time.Millisecond)
-	i1.Broadcast(sent)
+	i1.Send(sent, *conn2.LocalAddr().(*net.TCPAddr))
+	i1.Send(secret, *conn3.LocalAddr().(*net.TCPAddr))
 	received := <-c2
 	if received != sent {
 		t.Errorf("Received (%d) message doesn't equal the sent (lorem ipsum) message", received)
 	}
 	received = <-c3
-	if received != sent {
-		t.Errorf("Received (%d) message doesn't equal the sent (lorem ipsum) message", received)
+	if received != secret {
+		t.Errorf("Received (%d) message doesn't equal the sent (ipsum lorem) message", received)
 	}
 }
