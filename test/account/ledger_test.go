@@ -7,12 +7,20 @@ import (
 	"vicoin/registration"
 )
 
+func TestLedgersCanSetandGetAccountBalance(t *testing.T) {
+	ledger := account.NewLedger()
+	ledger.SetBalance("hej", 10)
+	if ledger.GetBalance("hej") != 10 {
+		t.Error("Error when setting or getting balance")
+	}
+}
 func TestLedgersCanPerformTransactionSignedBySendingAccount(t *testing.T) {
 	registration.RegisterStructsWithGob()
 	ledger := account.NewLedger()
 	public, private, _ := crypto.KeyGen(2048)
 	senderAccount, _ := public.ToString()
-	transaction, _ := account.NewSignedTransaction("id", senderAccount, "recipient", 0, private)
+	ledger.SetBalance(senderAccount, 42)
+	transaction, _ := account.NewSignedTransaction("id", senderAccount, "recipient", 10, private)
 	err := ledger.SignedTransaction(transaction)
 	if err != nil {
 		t.Error("Error when performing legitimate transaction : ", err)
