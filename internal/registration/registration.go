@@ -2,8 +2,8 @@ package registration
 
 import (
 	"encoding/gob"
-	"vicoin/account"
 	"vicoin/crypto"
+	"vicoin/internal/account"
 )
 
 func RegisterStructsWithGob() {

@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"math/big"
-	"vicoin/encoding"
+	"vicoin/internal/encoding"
 )
 
 type PrivateKey struct {

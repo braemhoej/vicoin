@@ -2,12 +2,12 @@ package account
 
 import (
 	"testing"
-	"vicoin/account"
 	"vicoin/crypto"
-	"vicoin/registration"
+	"vicoin/internal/account"
+	"vicoin/internal/registration"
 )
 
-func TestLedgersCanSetandGetAccountBalance(t *testing.T) {
+func TestLedgersCanSetAndGetAccountBalance(t *testing.T) {
 	ledger := account.NewLedger()
 	ledger.SetBalance("hej", 10)
 	if ledger.GetBalance("hej") != 10 {

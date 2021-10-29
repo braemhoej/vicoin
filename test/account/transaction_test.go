@@ -2,9 +2,9 @@ package account
 
 import (
 	"testing"
-	"vicoin/account"
 	"vicoin/crypto"
-	"vicoin/registration"
+	"vicoin/internal/account"
+	"vicoin/internal/registration"
 )
 
 func TestTransactionsCanBeSigned(t *testing.T) {
