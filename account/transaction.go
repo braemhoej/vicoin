@@ -5,32 +5,28 @@ import (
 )
 
 type Transaction struct {
-	ID     string  // Any string
-	From   string  // A verification key coded as a string
-	To     string  // A verification key coded as a string
-	Amount float64 // Amount to transfer
+	ID     string
+	From   string
+	To     string
+	Amount float64
 }
 
-func NewTransaction(id string, from string, to string, amount float64) *Transaction {
-	return &Transaction{
+type SignedTransaction struct {
+	ID        string
+	From      string
+	To        string
+	Amount    float64
+	Signature string
+}
+
+func NewSignedTransaction(id string, from string, to string, amount float64, key *crypto.PrivateKey) (*SignedTransaction, error) {
+	unsignedTransaction := Transaction{
 		ID:     id,
 		From:   from,
 		To:     to,
 		Amount: amount,
 	}
-}
-
-type SignedTransaction struct {
-	ID        string  // Any string
-	From      string  // A verification key coded as a string
-	To        string  // A verification key coded as a string
-	Amount    float64 // Amount to transfer
-	Signature string  // Potential signature coded as string
-}
-
-func NewSignedTransaction(id string, from string, to string, amount float64, key *crypto.PrivateKey) (*SignedTransaction, error) {
-	transaction := NewTransaction(id, from, to, amount)
-	signature, err := crypto.Sign(transaction, key)
+	signature, err := crypto.Sign(unsignedTransaction, key)
 	if err != nil {
 		return nil, err
 	}
@@ -42,9 +38,14 @@ func NewSignedTransaction(id string, from string, to string, amount float64, key
 		Signature: string(signature),
 	}, nil
 }
-func (transaction *SignedTransaction) Validate(key *crypto.PublicKey) (isValid bool, err error) {
-	unsignedTransaction := NewTransaction(transaction.ID, transaction.From, transaction.To, transaction.Amount)
-	isValid, err = crypto.Validate(unsignedTransaction, []byte(transaction.Signature), key)
+func (signedTransaction *SignedTransaction) Validate(key *crypto.PublicKey) (isValid bool, err error) {
+	unsignedTransaction := Transaction{
+		ID:     signedTransaction.ID,
+		From:   signedTransaction.From,
+		To:     signedTransaction.To,
+		Amount: signedTransaction.Amount,
+	}
+	isValid, err = crypto.Validate(unsignedTransaction, []byte(signedTransaction.Signature), key)
 	if err != nil {
 		return false, err
 	}

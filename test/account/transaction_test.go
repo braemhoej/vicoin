@@ -1,14 +1,14 @@
 package account
 
 import (
-	"encoding/gob"
 	"testing"
 	"vicoin/account"
 	"vicoin/crypto"
+	"vicoin/registration"
 )
 
 func TestTransactionsCanBeSigned(t *testing.T) {
-	gob.Register(account.Transaction{})
+	registration.RegisterStructsWithGob()
 	_, private, _ := crypto.KeyGen(2048)
 	signedTransaction, _ := account.NewSignedTransaction("id", "claus", "santa", 24.12, private)
 	if signedTransaction.Signature == "" {
@@ -16,7 +16,7 @@ func TestTransactionsCanBeSigned(t *testing.T) {
 	}
 }
 func TestCorrectlySignedTransactionsCanBeValidated(t *testing.T) {
-	gob.Register(account.Transaction{})
+	registration.RegisterStructsWithGob()
 	public, private, _ := crypto.KeyGen(2048)
 	signedTransaction, _ := account.NewSignedTransaction("id", "claus", "santa", 24.12, private)
 	isValid, err := signedTransaction.Validate(public)
@@ -25,7 +25,7 @@ func TestCorrectlySignedTransactionsCanBeValidated(t *testing.T) {
 	}
 }
 func TestCorrectlySignedTransactionsCantBeValidatedWithForeignKey(t *testing.T) {
-	gob.Register(account.Transaction{})
+	registration.RegisterStructsWithGob()
 	_, private, _ := crypto.KeyGen(2048)
 	foreignPublic, _, _ := crypto.KeyGen(2048)
 	signedTransaction, _ := account.NewSignedTransaction("id", "claus", "santa", 24.12, private)
@@ -35,7 +35,7 @@ func TestCorrectlySignedTransactionsCantBeValidatedWithForeignKey(t *testing.T) 
 	}
 }
 func TestIncorrectlySignedTransactionsCantBeValidated(t *testing.T) {
-	gob.Register(account.Transaction{})
+	registration.RegisterStructsWithGob()
 	public, private, _ := crypto.KeyGen(2048)
 	signedTransaction, _ := account.NewSignedTransaction("id", "claus", "santa", 24.12, private)
 	signedTransaction.From = "darthvader"
