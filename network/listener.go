@@ -2,11 +2,6 @@ package network
 
 import "net"
 
-type ListenerStrategy interface {
-	Accept() (net.Conn, error)
-	Addr() net.Addr
-}
-
 type TCPListener struct {
 	ln net.Listener
 }

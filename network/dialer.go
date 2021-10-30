@@ -2,10 +2,6 @@ package network
 
 import "net"
 
-type DialerStrategy interface {
-	Dial(net.Addr) (net.Conn, error)
-}
-
 type TCPDialer struct{}
 
 func NewTCPDialer() (*TCPDialer, error) {

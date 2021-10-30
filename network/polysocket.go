@@ -2,6 +2,7 @@ package network
 
 import (
 	"encoding/gob"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -97,14 +98,18 @@ func (polysocket *Polysocket) GetAddr() net.Addr {
 func (polysocket *Polysocket) listen() {
 	for {
 		socket, err := polysocket.listener.Accept()
+		fmt.Println("Accepted")
 		if err != nil {
+			fmt.Println("Error")
 			log.Println("Incoming connection dropped: ", err)
 		}
 		log.Println("Incoming connection accepted: ", socket.RemoteAddr().String())
+		fmt.Println("Adding")
 		polysocket.lock.Lock()
 		go polysocket.handle(socket)
 		polysocket.connections[socket.RemoteAddr().String()] = socket
 		polysocket.lock.Unlock()
+		fmt.Println("Added")
 	}
 }
 

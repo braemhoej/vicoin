@@ -8,8 +8,8 @@ import (
 	"vicoin/test/mocks"
 )
 
-func NewPolysocketMock(channel chan interface{}) *mocks.PolysocketMock {
-	return &mocks.PolysocketMock{
+func NewPolysocketMock(channel chan interface{}) *mocks.MockPolysocket {
+	return &mocks.MockPolysocket{
 		SentMessages:        make([]interface{}, 0),
 		BroadcastedMessages: make([]interface{}, 0),
 		Channel:             channel,
