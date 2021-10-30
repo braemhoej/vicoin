@@ -17,13 +17,7 @@ type Node struct {
 	lock     sync.Mutex
 }
 
-func NewNode() (*Node, error) {
-	internalChannel := make(chan interface{})
-	externalChannel := make(chan account.SignedTransaction)
-	polysocket, err := network.NewPolysocket(internalChannel)
-	if err != nil {
-		return nil, err
-	}
+func NewNode(polysocket SocketInterface, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
 		peers:    make(map[Peer]bool),
 		history:  make(map[account.SignedTransaction]bool),
@@ -32,6 +26,10 @@ func NewNode() (*Node, error) {
 		external: externalChannel,
 		lock:     sync.Mutex{},
 	}
+	self := Peer{
+		Addr: polysocket.GetAddr(),
+	}
+	node.peers[self] = true
 	go node.handle()
 	return node, nil
 }
@@ -57,6 +55,10 @@ func (node *Node) Connect(addr *net.TCPAddr) error {
 
 func (node *Node) Close() []error {
 	return node.socket.Close()
+}
+
+func (node *Node) GetPeers() map[Peer]bool {
+	return node.peers
 }
 
 func (node *Node) handle() {

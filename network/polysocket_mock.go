@@ -1,4 +1,4 @@
-package node
+package network
 
 import (
 	"net"
@@ -34,7 +34,7 @@ func (pm *PolysocketMock) Send(data interface{}, addr *net.TCPAddr) error {
 	return nil
 }
 
-func (pm *PolysocketMock) Broadcast(data interface{}) error {
+func (pm *PolysocketMock) Broadcast(data interface{}) []error {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.BroadcastedMessages = append(pm.SentMessages, data)
