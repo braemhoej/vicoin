@@ -9,9 +9,9 @@ import (
 )
 
 type Node struct {
-	peers    []Peer
+	peers    map[Peer]bool
 	history  map[account.SignedTransaction]bool
-	socket   *network.Polysocket
+	socket   SocketInterface
 	internal chan interface{}
 	external chan account.SignedTransaction
 	lock     sync.Mutex
@@ -25,7 +25,7 @@ func NewNode() (*Node, error) {
 		return nil, err
 	}
 	node := &Node{
-		peers:    make([]Peer, 0),
+		peers:    make(map[Peer]bool),
 		history:  make(map[account.SignedTransaction]bool),
 		socket:   polysocket,
 		internal: internalChannel,
@@ -36,6 +36,29 @@ func NewNode() (*Node, error) {
 	return node, nil
 }
 
+func (node *Node) Connect(addr *net.TCPAddr) error {
+	go node.handle()
+	conn, err := node.socket.Connect(addr)
+	if err != nil {
+		return err
+	}
+	peerRequest := network.Packet{
+		Instruction: network.PeerRequest,
+		Data:        conn.LocalAddr().(*net.TCPAddr),
+	}
+	node.socket.Send(peerRequest, conn.RemoteAddr().(*net.TCPAddr))
+	connAnnouncemet := network.Packet{
+		Instruction: network.ConnAnnouncment,
+		Data:        node.socket.GetAddr(),
+	}
+	node.socket.Broadcast(connAnnouncemet)
+	return nil
+}
+
+func (node *Node) Close() []error {
+	return node.socket.Close()
+}
+
 func (node *Node) handle() {
 	for {
 		msg := <-node.internal
@@ -43,19 +66,19 @@ func (node *Node) handle() {
 		case network.Packet:
 			switch packet.Instruction {
 			case network.PeerRequest:
-				requester := packet.Data.(net.TCPAddr)
+				requester := packet.Data.(*net.TCPAddr)
 				node.lock.Lock()
 				node.socket.Send(node.peers, requester)
 				node.lock.Unlock()
 			case network.PeerReply:
-				peers := packet.Data.([]Peer)
+				peers := packet.Data.(map[Peer]bool)
 				node.lock.Lock()
 				node.peers = merge(peers, node.peers)
 				node.lock.Unlock()
 			case network.ConnAnnouncment:
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
-				node.peers = append(node.peers, peer)
+				node.peers[peer] = true
 				node.lock.Unlock()
 			case network.Transaction:
 				signedTransaction := packet.Data.(account.SignedTransaction)
@@ -68,7 +91,9 @@ func (node *Node) handle() {
 	}
 }
 
-func merge(received []Peer, known []Peer) []Peer {
-	//TODO: Do merge
-	return nil
+func merge(received map[Peer]bool, known map[Peer]bool) map[Peer]bool {
+	for peer := range received {
+		known[peer] = true
+	}
+	return known
 }

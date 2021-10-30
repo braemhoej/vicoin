@@ -6,13 +6,8 @@ import (
 	"io"
 	"log"
 	"net"
-	"strconv"
 	"sync"
 )
-
-func TCP2Strings(addr *net.TCPAddr) (string, string) {
-	return "[" + addr.IP.String() + "]", strconv.Itoa(addr.Port)
-}
 
 type Polysocket struct {
 	listener    net.Listener
@@ -80,7 +75,7 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 	return errors
 }
 
-func (polysocket *Polysocket) Send(data interface{}, addr net.TCPAddr) error {
+func (polysocket *Polysocket) Send(data interface{}, addr *net.TCPAddr) error {
 	polysocket.lock.Lock()
 	defer polysocket.lock.Unlock()
 	fmt.Print("Address: " + addr.String())

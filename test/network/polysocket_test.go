@@ -1,4 +1,4 @@
-package network
+package network_test
 
 import (
 	"net"
@@ -84,8 +84,8 @@ func TestPolysocketsSendsOnlyToTarget(t *testing.T) {
 	sent := "lorem ipsum"
 	secret := "ipsum lorem"
 	time.Sleep(50 * time.Millisecond)
-	i1.Send(sent, *conn2.LocalAddr().(*net.TCPAddr))
-	i1.Send(secret, *conn3.LocalAddr().(*net.TCPAddr))
+	i1.Send(sent, conn2.LocalAddr().(*net.TCPAddr))
+	i1.Send(secret, conn3.LocalAddr().(*net.TCPAddr))
 	received := <-c2
 	if received != sent {
 		t.Errorf("Received (%d) message doesn't equal the sent (lorem ipsum) message", received)
