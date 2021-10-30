@@ -2,7 +2,6 @@ package network
 
 import (
 	"encoding/gob"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -10,33 +9,30 @@ import (
 )
 
 type Polysocket struct {
-	listener    net.Listener
+	listener    ListenerStrategy
+	dialer      DialerStrategy
 	connections map[string]net.Conn
-	addr        *net.TCPAddr
+	addr        net.Addr
 	channel     chan interface{}
 	lock        sync.Mutex
 }
 
-func NewPolysocket(internal chan interface{}) (polysocket *Polysocket, err error) {
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return nil, err
-	}
+func NewPolysocket(internal chan interface{}, dialerStrategy DialerStrategy, listenerStrategy ListenerStrategy) (polysocket *Polysocket) {
 	polysocket = &Polysocket{
+		listener:    listenerStrategy,
+		dialer:      dialerStrategy,
 		connections: make(map[string]net.Conn),
 		addr:        nil,
 		channel:     internal,
 		lock:        sync.Mutex{},
 	}
-	polysocket.listener = listener
-	polysocket.addr = polysocket.listener.Addr().(*net.TCPAddr)
+	polysocket.addr = polysocket.listener.Addr()
 	go polysocket.listen()
-	return polysocket, err
+	return polysocket
 }
 
-func (polysocket *Polysocket) Connect(addr *net.TCPAddr) (net.Conn, error) {
-	local, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
-	socket, err := net.DialTCP("tcp", local, addr)
+func (polysocket *Polysocket) Connect(addr net.Addr) (net.Conn, error) {
+	socket, err := polysocket.dialer.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +74,7 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 func (polysocket *Polysocket) Send(data interface{}, addr *net.TCPAddr) error {
 	polysocket.lock.Lock()
 	defer polysocket.lock.Unlock()
-	fmt.Print("Address: " + addr.String())
 	socket := polysocket.connections[addr.String()]
-	fmt.Print(socket)
 	enc := gob.NewEncoder(socket)
 	err := enc.Encode(&data)
 	if err != nil {
@@ -95,7 +89,7 @@ func (polysocket *Polysocket) GetConnections() map[string]net.Conn {
 	return polysocket.connections
 }
 
-func (polysocket *Polysocket) GetAddr() *net.TCPAddr {
+func (polysocket *Polysocket) GetAddr() net.Addr {
 	return polysocket.addr
 }
 

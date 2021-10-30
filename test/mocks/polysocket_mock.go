@@ -1,4 +1,4 @@
-package network
+package mocks
 
 import (
 	"net"
@@ -9,7 +9,7 @@ type PolysocketMock struct {
 	SentMessages        []interface{}
 	BroadcastedMessages []interface{}
 	Channel             chan interface{}
-	Connections         []*net.TCPAddr
+	Connections         []net.Addr
 	lock                sync.Mutex
 }
 
@@ -17,7 +17,7 @@ func (pm *PolysocketMock) InjectMessage(data interface{}) {
 	pm.Channel <- data
 }
 
-func (pm *PolysocketMock) Connect(addr *net.TCPAddr) (net.Conn, error) {
+func (pm *PolysocketMock) Connect(addr net.Addr) (net.Conn, error) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.Connections = append(pm.Connections, addr)
