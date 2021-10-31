@@ -5,7 +5,7 @@ import (
 	"testing"
 	"vicoin/internal/account"
 	"vicoin/internal/node"
-	"vicoin/test/mocks"
+	"vicoin/test/mocks/network"
 )
 
 func NewPolysocketMock(channel chan interface{}) *mocks.MockPolysocket {

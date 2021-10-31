@@ -1,6 +1,8 @@
 package network
 
-import "net"
+import (
+	"net"
+)
 
 type Socket interface {
 	Connect(addr net.Addr) (net.Conn, error)

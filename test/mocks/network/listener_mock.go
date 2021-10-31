@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"fmt"
 	"net"
 )
 
@@ -17,7 +16,6 @@ func NewMockListener() *MockListener {
 
 func (listener *MockListener) Accept() (net.Conn, error) {
 	conn := <-listener.internal
-	fmt.Println("Received conn")
 	return conn, nil
 }
 
@@ -27,7 +25,6 @@ func (listener *MockListener) Addr() net.Addr {
 
 func (listener *MockListener) SetNextSocket(socket net.Conn) {
 	go func() {
-		fmt.Print("Sending conn")
 		listener.internal <- socket
 	}()
 }

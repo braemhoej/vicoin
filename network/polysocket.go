@@ -63,19 +63,22 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 	defer polysocket.lock.Unlock()
 	var errors []error
 	for _, socket := range polysocket.connections {
+		fmt.Println("Writing")
 		enc := gob.NewEncoder(socket)
 		err := enc.Encode(&data)
 		if err != nil {
 			errors = append(errors, err)
 		}
 	}
+	fmt.Println("Done")
 	return errors
 }
 
-func (polysocket *Polysocket) Send(data interface{}, addr *net.TCPAddr) error {
+func (polysocket *Polysocket) Send(data interface{}, addr net.Addr) error {
 	polysocket.lock.Lock()
 	defer polysocket.lock.Unlock()
 	socket := polysocket.connections[addr.String()]
+	fmt.Println(socket.RemoteAddr())
 	enc := gob.NewEncoder(socket)
 	err := enc.Encode(&data)
 	if err != nil {
@@ -98,18 +101,14 @@ func (polysocket *Polysocket) GetAddr() net.Addr {
 func (polysocket *Polysocket) listen() {
 	for {
 		socket, err := polysocket.listener.Accept()
-		fmt.Println("Accepted")
 		if err != nil {
-			fmt.Println("Error")
-			log.Println("Incoming connection dropped: ", err)
+			log.Println("Incoming net.Conn dropped: ", err)
 		}
-		log.Println("Incoming connection accepted: ", socket.RemoteAddr().String())
-		fmt.Println("Adding")
+		log.Println("Incoming net.Conn accepted: ", socket.RemoteAddr().String())
 		polysocket.lock.Lock()
 		go polysocket.handle(socket)
 		polysocket.connections[socket.RemoteAddr().String()] = socket
 		polysocket.lock.Unlock()
-		fmt.Println("Added")
 	}
 }
 
@@ -120,7 +119,7 @@ func (polysocket *Polysocket) handle(socket net.Conn) {
 	for {
 		err := dec.Decode(&buffer)
 		if err == io.EOF {
-			log.Println("Connection closed by " + socket.RemoteAddr().String())
+			log.Println("net.Conn closed by " + socket.RemoteAddr().String())
 			polysocket.lock.Lock()
 			delete(polysocket.connections, socket.RemoteAddr().String())
 			polysocket.lock.Unlock()

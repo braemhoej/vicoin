@@ -1,6 +1,8 @@
 package mocks
 
-import "net"
+import (
+	"net"
+)
 
 type MockDialer struct {
 	internal chan net.Conn
