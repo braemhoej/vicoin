@@ -5,15 +5,15 @@ import (
 	"testing"
 	"vicoin/internal/account"
 	"vicoin/internal/node"
-	"vicoin/network"
+	"vicoin/test/mocks/network"
 )
 
-func NewPolysocketMock(channel chan interface{}) *network.PolysocketMock {
-	return &network.PolysocketMock{
+func NewPolysocketMock(channel chan interface{}) *mocks.MockPolysocket {
+	return &mocks.MockPolysocket{
 		SentMessages:        make([]interface{}, 0),
 		BroadcastedMessages: make([]interface{}, 0),
 		Channel:             channel,
-		Connections:         make([]*net.TCPAddr, 0),
+		Connections:         make([]net.Addr, 0),
 	}
 }
 

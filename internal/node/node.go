@@ -11,13 +11,13 @@ import (
 type Node struct {
 	peers    map[Peer]bool
 	history  map[account.SignedTransaction]bool
-	socket   SocketInterface
+	socket   network.Socket
 	internal chan interface{}
 	external chan account.SignedTransaction
 	lock     sync.Mutex
 }
 
-func NewNode(polysocket SocketInterface, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
+func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
 		peers:    make(map[Peer]bool),
 		history:  make(map[account.SignedTransaction]bool),
@@ -34,7 +34,7 @@ func NewNode(polysocket SocketInterface, internalChannel chan interface{}, exter
 	return node, nil
 }
 
-func (node *Node) Connect(addr *net.TCPAddr) error {
+func (node *Node) Connect(addr net.Addr) error {
 	go node.handle()
 	conn, err := node.socket.Connect(addr)
 	if err != nil {

@@ -10,33 +10,30 @@ import (
 )
 
 type Polysocket struct {
-	listener    net.Listener
+	listener    ListenerStrategy
+	dialer      DialerStrategy
 	connections map[string]net.Conn
-	addr        *net.TCPAddr
+	addr        net.Addr
 	channel     chan interface{}
 	lock        sync.Mutex
 }
 
-func NewPolysocket(internal chan interface{}) (polysocket *Polysocket, err error) {
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return nil, err
-	}
+func NewPolysocket(internal chan interface{}, dialerStrategy DialerStrategy, listenerStrategy ListenerStrategy) (polysocket *Polysocket) {
 	polysocket = &Polysocket{
+		listener:    listenerStrategy,
+		dialer:      dialerStrategy,
 		connections: make(map[string]net.Conn),
 		addr:        nil,
 		channel:     internal,
 		lock:        sync.Mutex{},
 	}
-	polysocket.listener = listener
-	polysocket.addr = polysocket.listener.Addr().(*net.TCPAddr)
+	polysocket.addr = polysocket.listener.Addr()
 	go polysocket.listen()
-	return polysocket, err
+	return polysocket
 }
 
-func (polysocket *Polysocket) Connect(addr *net.TCPAddr) (net.Conn, error) {
-	local, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
-	socket, err := net.DialTCP("tcp", local, addr)
+func (polysocket *Polysocket) Connect(addr net.Addr) (net.Conn, error) {
+	socket, err := polysocket.dialer.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -66,21 +63,22 @@ func (polysocket *Polysocket) Broadcast(data interface{}) []error {
 	defer polysocket.lock.Unlock()
 	var errors []error
 	for _, socket := range polysocket.connections {
+		fmt.Println("Writing")
 		enc := gob.NewEncoder(socket)
 		err := enc.Encode(&data)
 		if err != nil {
 			errors = append(errors, err)
 		}
 	}
+	fmt.Println("Done")
 	return errors
 }
 
-func (polysocket *Polysocket) Send(data interface{}, addr *net.TCPAddr) error {
+func (polysocket *Polysocket) Send(data interface{}, addr net.Addr) error {
 	polysocket.lock.Lock()
 	defer polysocket.lock.Unlock()
-	fmt.Print("Address: " + addr.String())
 	socket := polysocket.connections[addr.String()]
-	fmt.Print(socket)
+	fmt.Println(socket.RemoteAddr())
 	enc := gob.NewEncoder(socket)
 	err := enc.Encode(&data)
 	if err != nil {
@@ -95,7 +93,7 @@ func (polysocket *Polysocket) GetConnections() map[string]net.Conn {
 	return polysocket.connections
 }
 
-func (polysocket *Polysocket) GetAddr() *net.TCPAddr {
+func (polysocket *Polysocket) GetAddr() net.Addr {
 	return polysocket.addr
 }
 
@@ -104,9 +102,9 @@ func (polysocket *Polysocket) listen() {
 	for {
 		socket, err := polysocket.listener.Accept()
 		if err != nil {
-			log.Println("Incoming connection dropped: ", err)
+			log.Println("Incoming net.Conn dropped: ", err)
 		}
-		log.Println("Incoming connection accepted: ", socket.RemoteAddr().String())
+		log.Println("Incoming net.Conn accepted: ", socket.RemoteAddr().String())
 		polysocket.lock.Lock()
 		go polysocket.handle(socket)
 		polysocket.connections[socket.RemoteAddr().String()] = socket
@@ -121,7 +119,7 @@ func (polysocket *Polysocket) handle(socket net.Conn) {
 	for {
 		err := dec.Decode(&buffer)
 		if err == io.EOF {
-			log.Println("Connection closed by " + socket.RemoteAddr().String())
+			log.Println("net.Conn closed by " + socket.RemoteAddr().String())
 			polysocket.lock.Lock()
 			delete(polysocket.connections, socket.RemoteAddr().String())
 			polysocket.lock.Unlock()
