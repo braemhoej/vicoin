@@ -8,7 +8,7 @@ type Socket interface {
 	Connect(addr net.Addr) (net.Conn, error)
 	Close() []error
 	Broadcast(data interface{}) []error
-	Send(data interface{}, addr *net.TCPAddr) error
+	Send(data interface{}, addr net.Addr) error
 	GetAddr() *net.TCPAddr
 }
 

@@ -42,9 +42,9 @@ func (node *Node) Connect(addr net.Addr) error {
 	}
 	peerRequest := network.Packet{
 		Instruction: network.PeerRequest,
-		Data:        conn.LocalAddr().(*net.TCPAddr),
+		Data:        conn.LocalAddr(),
 	}
-	node.socket.Send(peerRequest, conn.RemoteAddr().(*net.TCPAddr))
+	node.socket.Send(peerRequest, conn.RemoteAddr())
 	connAnnouncemet := network.Packet{
 		Instruction: network.ConnAnnouncment,
 		Data:        node.socket.GetAddr(),
@@ -70,7 +70,11 @@ func (node *Node) handle() {
 			case network.PeerRequest:
 				requester := packet.Data.(*net.TCPAddr)
 				node.lock.Lock()
-				node.socket.Send(node.peers, requester)
+				reply := network.Packet{
+					Instruction: network.PeerReply,
+					Data:        node.peers,
+				}
+				node.socket.Send(reply, requester)
 				node.lock.Unlock()
 			case network.PeerReply:
 				peers := packet.Data.(map[Peer]bool)
