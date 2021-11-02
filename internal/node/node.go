@@ -10,7 +10,7 @@ import (
 
 type Node struct {
 	peers    map[Peer]bool
-	history  map[account.SignedTransaction]bool
+	history  map[network.Packet]bool
 	socket   network.Socket
 	internal chan interface{}
 	external chan account.SignedTransaction
@@ -20,7 +20,7 @@ type Node struct {
 func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
 		peers:    make(map[Peer]bool),
-		history:  make(map[account.SignedTransaction]bool),
+		history:  make(map[network.Packet]bool),
 		socket:   polysocket,
 		internal: internalChannel,
 		external: externalChannel,
@@ -66,9 +66,12 @@ func (node *Node) handle() {
 		msg := <-node.internal
 		switch packet := msg.(type) {
 		case network.Packet:
+			if seen := node.history[msg.(network.Packet)]; seen {
+				continue
+			}
 			switch packet.Instruction {
 			case network.PeerRequest:
-				requester := packet.Data.(*net.TCPAddr)
+				requester := packet.Data.(net.Addr)
 				node.lock.Lock()
 				reply := network.Packet{
 					Instruction: network.PeerReply,
@@ -85,9 +88,11 @@ func (node *Node) handle() {
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
 				node.peers[peer] = true
+				node.socket.Broadcast(msg)
 				node.lock.Unlock()
 			case network.Transaction:
 				signedTransaction := packet.Data.(account.SignedTransaction)
+				node.socket.Broadcast(msg)
 				node.external <- signedTransaction
 			}
 		default:

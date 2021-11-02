@@ -90,3 +90,49 @@ func TestNodesBroadcastConnectionAnnouncementUponConnection(t *testing.T) {
 		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
 	}
 }
+
+func TestNodesPropagateConnectionAnnouncements(t *testing.T) {
+	internal := make(chan interface{})
+	external := make(chan account.SignedTransaction)
+	mock := NewPolysocketMock(internal)
+	n, _ := node.NewNode(mock, internal, external)
+	n.Connect(&net.TCPAddr{}) // Mock address
+	mock.InjectMessage(network.Packet{Instruction: network.ConnAnnouncment, Data: node.Peer{}})
+	time.Sleep(50 * time.Millisecond)
+	if len(mock.BroadcastedMessages) != 2 {
+		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
+	}
+	msg := mock.BroadcastedMessages[1].(network.Packet)
+	if msg.Instruction != network.ConnAnnouncment {
+		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
+	}
+}
+
+func TestNodesSendSignedTransactionsOnChannel(t *testing.T) {
+	internal := make(chan interface{})
+	external := make(chan account.SignedTransaction)
+	mock := NewPolysocketMock(internal)
+	node, _ := node.NewNode(mock, internal, external)
+	node.Connect(&net.TCPAddr{}) // Mock address
+	mock.InjectMessage(network.Packet{Instruction: network.Transaction, Data: account.SignedTransaction{}})
+	time.Sleep(50 * time.Millisecond)
+	<-external
+}
+
+func TestNodesPropagateTransactions(t *testing.T) {
+	internal := make(chan interface{})
+	external := make(chan account.SignedTransaction)
+	mock := NewPolysocketMock(internal)
+	n, _ := node.NewNode(mock, internal, external)
+	n.Connect(&net.TCPAddr{}) // Mock address
+	mock.InjectMessage(network.Packet{Instruction: network.Transaction, Data: account.SignedTransaction{}})
+	time.Sleep(50 * time.Millisecond)
+	<-external
+	if len(mock.BroadcastedMessages) != 2 {
+		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
+	}
+	msg := mock.BroadcastedMessages[1].(network.Packet)
+	if msg.Instruction != network.Transaction {
+		t.Errorf("Unexpected instruction %d, want 4", msg.Instruction)
+	}
+}
