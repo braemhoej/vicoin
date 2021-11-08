@@ -2,7 +2,10 @@
 
 ### Todo
 
-- [ ] Add testing for strengthening of network #test  
+- [ ] Add testing for strengthening of network #test
+- [ ] Strengthen crypto
+    - [ ] Ensure keys are padded
+    - [ ] Introduce the use of nonces
 
 ### In Progress
 

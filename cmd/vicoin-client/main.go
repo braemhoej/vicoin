@@ -207,6 +207,24 @@ func handleInput(input string, client *client.Client) (quit bool) {
 				}
 			}
 		}
+	case "generate keys":
+		public, private, err := crypto.KeyGen(2048)
+		if err != nil {
+			fmt.Println("Error : ", err)
+			return
+		}
+		pubstring, err := public.ToString()
+		if err != nil {
+			fmt.Println("Error : ", err)
+			return
+		}
+		pristring, err := private.ToString()
+		if err != nil {
+			fmt.Println("Error : ", err)
+			return
+		}
+		fmt.Println("public : ", pubstring)
+		fmt.Println("\nprivate : ", pristring)
 	case "quit":
 		errs := client.Close()
 		fmt.Println("Quitting ... ")
