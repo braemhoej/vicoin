@@ -9,7 +9,7 @@ import (
 )
 
 type Node struct {
-	peers    map[Peer]bool
+	peers    []Peer
 	history  map[network.Packet]bool
 	socket   network.Socket
 	internal chan interface{}
@@ -19,7 +19,7 @@ type Node struct {
 
 func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
-		peers:    make(map[Peer]bool),
+		peers:    make([]Peer, 0),
 		history:  make(map[network.Packet]bool),
 		socket:   polysocket,
 		internal: internalChannel,
@@ -29,7 +29,7 @@ func NewNode(polysocket network.Socket, internalChannel chan interface{}, extern
 	self := Peer{
 		Addr: polysocket.GetAddr(),
 	}
-	node.peers[self] = true
+	node.peers = append(node.peers, self)
 	go node.handle()
 	return node, nil
 }
@@ -57,11 +57,12 @@ func (node *Node) Close() []error {
 	return node.socket.Close()
 }
 
-func (node *Node) GetPeers() map[Peer]bool {
+func (node *Node) GetPeers() []Peer {
 	return node.peers
 }
 
 func (node *Node) handle() {
+	// NOTE: Currently vulnerable to malformed packages !!!!
 	for {
 		msg := <-node.internal
 		switch packet := msg.(type) {
@@ -80,14 +81,15 @@ func (node *Node) handle() {
 				node.socket.Send(reply, requester)
 				node.lock.Unlock()
 			case network.PeerReply:
-				peers := packet.Data.(map[Peer]bool)
+				peers := packet.Data.([]Peer)
 				node.lock.Lock()
 				node.peers = merge(peers, node.peers)
 				node.lock.Unlock()
+				node.StrengthenNetwork()
 			case network.ConnAnnouncment:
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
-				node.peers[peer] = true
+				node.peers = append(node.peers, peer)
 				node.socket.Broadcast(msg)
 				node.lock.Unlock()
 			case network.Transaction:
@@ -102,9 +104,43 @@ func (node *Node) handle() {
 	}
 }
 
-func merge(received map[Peer]bool, known map[Peer]bool) map[Peer]bool {
-	for peer := range received {
-		known[peer] = true
+func (node *Node) SendTransaction(transaction account.SignedTransaction) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	wrappedTransaction := network.Packet{
+		Instruction: network.Transaction,
+		Data:        transaction,
 	}
-	return known
+	node.socket.Broadcast(wrappedTransaction)
+}
+
+func (node *Node) StrengthenNetwork() {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	index := len(node.peers)
+	if len(node.peers) > 11 {
+		index = 11
+	}
+	for _, peer := range node.peers[len(node.peers)-index : len(node.peers)-1] {
+		node.socket.Connect(peer.Addr)
+	}
+}
+
+func contains(list []Peer, peer Peer) bool {
+	for _, known := range list {
+		if known == peer {
+			return true
+		}
+	}
+	return false
+}
+
+func merge(received []Peer, known []Peer) []Peer {
+	output := known
+	for _, addr := range received {
+		if !contains(output, addr) {
+			output = append(output, addr)
+		}
+	}
+	return output
 }
