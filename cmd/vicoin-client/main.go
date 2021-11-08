@@ -147,7 +147,13 @@ func login(client *client.Client) {
 
 func printHelp() {
 	fmt.Println("Valid commands: ")
+	format := "%-12s : %-12s\n"
 	//TODO: Implement
+	fmt.Printf(format, "quit", "exits the shell")
+	fmt.Printf(format, "help", "prints this")
+	fmt.Printf(format, "connect", "initiate shell interaction for establishing TCP connection")
+	fmt.Printf(format, "transfer", "initiate shell interaction for transfering funds")
+	fmt.Printf(format, "balance", "initiate shell interaction for looking up balance")
 }
 
 func handleInput(input string, client *client.Client) (quit bool) {
