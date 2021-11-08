@@ -9,8 +9,8 @@ import (
 )
 
 type Node struct {
-	peers    map[Peer]bool
-	history  map[account.SignedTransaction]bool
+	peers    []Peer
+	history  map[network.Packet]bool
 	socket   network.Socket
 	internal chan interface{}
 	external chan account.SignedTransaction
@@ -19,8 +19,8 @@ type Node struct {
 
 func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
-		peers:    make(map[Peer]bool),
-		history:  make(map[account.SignedTransaction]bool),
+		peers:    make([]Peer, 0),
+		history:  make(map[network.Packet]bool),
 		socket:   polysocket,
 		internal: internalChannel,
 		external: externalChannel,
@@ -29,7 +29,7 @@ func NewNode(polysocket network.Socket, internalChannel chan interface{}, extern
 	self := Peer{
 		Addr: polysocket.GetAddr(),
 	}
-	node.peers[self] = true
+	node.peers = append(node.peers, self)
 	go node.handle()
 	return node, nil
 }
@@ -42,9 +42,9 @@ func (node *Node) Connect(addr net.Addr) error {
 	}
 	peerRequest := network.Packet{
 		Instruction: network.PeerRequest,
-		Data:        conn.LocalAddr().(*net.TCPAddr),
+		Data:        conn.LocalAddr(),
 	}
-	node.socket.Send(peerRequest, conn.RemoteAddr().(*net.TCPAddr))
+	node.socket.Send(peerRequest, conn.RemoteAddr())
 	connAnnouncemet := network.Packet{
 		Instruction: network.ConnAnnouncment,
 		Data:        node.socket.GetAddr(),
@@ -57,7 +57,7 @@ func (node *Node) Close() []error {
 	return node.socket.Close()
 }
 
-func (node *Node) GetPeers() map[Peer]bool {
+func (node *Node) GetPeers() []Peer {
 	return node.peers
 }
 
@@ -66,24 +66,35 @@ func (node *Node) handle() {
 		msg := <-node.internal
 		switch packet := msg.(type) {
 		case network.Packet:
+			if seen := node.history[msg.(network.Packet)]; seen {
+				continue
+			}
 			switch packet.Instruction {
+			// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
 			case network.PeerRequest:
-				requester := packet.Data.(*net.TCPAddr)
+				requester := packet.Data.(net.Addr)
 				node.lock.Lock()
-				node.socket.Send(node.peers, requester)
+				reply := network.Packet{
+					Instruction: network.PeerReply,
+					Data:        node.peers,
+				}
+				node.socket.Send(reply, requester)
 				node.lock.Unlock()
 			case network.PeerReply:
-				peers := packet.Data.(map[Peer]bool)
+				peers := packet.Data.([]Peer)
 				node.lock.Lock()
 				node.peers = merge(peers, node.peers)
 				node.lock.Unlock()
+				node.StrengthenNetwork()
 			case network.ConnAnnouncment:
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
-				node.peers[peer] = true
+				node.peers = append(node.peers, peer)
+				node.socket.Broadcast(msg)
 				node.lock.Unlock()
 			case network.Transaction:
 				signedTransaction := packet.Data.(account.SignedTransaction)
+				node.socket.Broadcast(msg)
 				node.external <- signedTransaction
 			}
 		default:
@@ -93,9 +104,43 @@ func (node *Node) handle() {
 	}
 }
 
-func merge(received map[Peer]bool, known map[Peer]bool) map[Peer]bool {
-	for peer := range received {
-		known[peer] = true
+func (node *Node) SendTransaction(transaction account.SignedTransaction) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	wrappedTransaction := network.Packet{
+		Instruction: network.Transaction,
+		Data:        transaction,
 	}
-	return known
+	node.socket.Broadcast(wrappedTransaction)
+}
+
+func (node *Node) StrengthenNetwork() {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	index := len(node.peers)
+	if len(node.peers) > 11 {
+		index = 11
+	}
+	for _, peer := range node.peers[len(node.peers)-index : len(node.peers)-1] {
+		node.socket.Connect(peer.Addr)
+	}
+}
+
+func contains(list []Peer, peer Peer) bool {
+	for _, known := range list {
+		if known == peer {
+			return true
+		}
+	}
+	return false
+}
+
+func merge(received []Peer, known []Peer) []Peer {
+	output := known
+	for _, addr := range received {
+		if !contains(output, addr) {
+			output = append(output, addr)
+		}
+	}
+	return output
 }

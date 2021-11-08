@@ -21,13 +21,12 @@ func (pm *MockPolysocket) Connect(addr net.Addr) (net.Conn, error) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.Connections = append(pm.Connections, addr)
-	conn, _ := net.Pipe()
-	return conn, nil
+	return &net.TCPConn{}, nil
 }
 func (pm *MockPolysocket) Close() []error {
 	return nil
 }
-func (pm *MockPolysocket) Send(data interface{}, addr *net.TCPAddr) error {
+func (pm *MockPolysocket) Send(data interface{}, addr net.Addr) error {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.SentMessages = append(pm.SentMessages, data)
@@ -37,7 +36,7 @@ func (pm *MockPolysocket) Send(data interface{}, addr *net.TCPAddr) error {
 func (pm *MockPolysocket) Broadcast(data interface{}) []error {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	pm.BroadcastedMessages = append(pm.SentMessages, data)
+	pm.BroadcastedMessages = append(pm.BroadcastedMessages, data)
 	return nil
 }
 
