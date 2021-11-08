@@ -62,7 +62,6 @@ func (node *Node) GetPeers() []Peer {
 }
 
 func (node *Node) handle() {
-	// NOTE: Currently vulnerable to malformed packages !!!!
 	for {
 		msg := <-node.internal
 		switch packet := msg.(type) {
@@ -71,6 +70,7 @@ func (node *Node) handle() {
 				continue
 			}
 			switch packet.Instruction {
+			// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
 			case network.PeerRequest:
 				requester := packet.Data.(net.Addr)
 				node.lock.Lock()
