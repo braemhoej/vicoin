@@ -9,7 +9,7 @@ type Socket interface {
 	Close() []error
 	Broadcast(data interface{}) []error
 	Send(data interface{}, addr net.Addr) error
-	GetAddr() *net.TCPAddr
+	GetAddr() net.Addr
 }
 
 type DialerStrategy interface {

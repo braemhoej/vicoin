@@ -40,7 +40,7 @@ func (pm *MockPolysocket) Broadcast(data interface{}) []error {
 	return nil
 }
 
-func (pm *MockPolysocket) GetAddr() *net.TCPAddr {
+func (pm *MockPolysocket) GetAddr() net.Addr {
 	return &net.TCPAddr{
 		IP:   nil,
 		Port: 0,

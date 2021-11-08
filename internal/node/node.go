@@ -61,6 +61,10 @@ func (node *Node) GetPeers() []Peer {
 	return node.peers
 }
 
+func (node *Node) GetAddr() net.Addr {
+	return node.socket.GetAddr()
+}
+
 func (node *Node) handle() {
 	for {
 		msg := <-node.internal
@@ -85,7 +89,7 @@ func (node *Node) handle() {
 				node.lock.Lock()
 				node.peers = merge(peers, node.peers)
 				node.lock.Unlock()
-				node.StrengthenNetwork()
+				node.strengthenNetwork()
 			case network.ConnAnnouncment:
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
@@ -114,7 +118,7 @@ func (node *Node) SendTransaction(transaction account.SignedTransaction) {
 	node.socket.Broadcast(wrappedTransaction)
 }
 
-func (node *Node) StrengthenNetwork() {
+func (node *Node) strengthenNetwork() {
 	node.lock.Lock()
 	defer node.lock.Unlock()
 	index := len(node.peers)
