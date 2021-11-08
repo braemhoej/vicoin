@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"testing"
+	"vicoin/crypto"
 	"vicoin/internal/account"
 	"vicoin/internal/client"
 	"vicoin/internal/registration"
@@ -39,9 +40,11 @@ func TestClientAttemptsToPerformTransactionsReceivedOnInternalChannel(t *testing
 
 func TestTransferAttemptsToPerformTransactionAndIncrementsNumberOfTransactions(t *testing.T) {
 	registration.RegisterStructsWithGob()
+	public, private, _ := crypto.KeyGen(2048)
 	ledger, node := makeDependencies()
 	internal := make(chan account.SignedTransaction)
 	c, err := client.NewClient(ledger, node, internal)
+	c.ProvideCredentials(public, private)
 	c.Transfer(10, "Santa")
 	if err != nil {
 		t.Error(err)

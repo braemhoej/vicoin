@@ -1,7 +1,9 @@
 package client
 
 import (
+	"errors"
 	"log"
+	"net"
 	"strconv"
 	"sync"
 	"vicoin/crypto"
@@ -21,23 +23,15 @@ type Client struct {
 }
 
 func NewClient(ledger account.LedgerInterface, node node.NodeInterface, internal chan account.SignedTransaction) (*Client, error) {
-	public, private, err := crypto.KeyGen(2048)
-	if err != nil {
-		return nil, err
-	}
-	account, err := public.ToString()
-	if err != nil {
-		return nil, err
-	}
 	client := Client{
 		ledger:               ledger,
 		node:                 node,
 		internal:             internal,
 		lock:                 sync.Mutex{},
 		numberOfTransactions: 0,
-		account:              account,
-		public:               public,
-		private:              private,
+		account:              "",
+		public:               nil,
+		private:              nil,
 	}
 	go client.handle()
 	return &client, nil
@@ -55,6 +49,9 @@ func (client *Client) handle() {
 func (client *Client) Transfer(amount float64, to string) error {
 	client.lock.Lock()
 	defer client.lock.Unlock()
+	if client.account == "" || client.private == nil || client.public == nil {
+		return errors.New("invalid credentials")
+	}
 	client.numberOfTransactions += 1
 	transaction, err := account.NewSignedTransaction(strconv.Itoa(client.numberOfTransactions), client.account, to, amount, client.private)
 	if err != nil {
@@ -70,6 +67,37 @@ func (client *Client) Transfer(amount float64, to string) error {
 	return nil
 }
 
-func (Client *Client) GetBalance(account string) float64 {
-	return Client.ledger.GetBalance(account)
+func (client *Client) ProvideCredentials(public *crypto.PublicKey, private *crypto.PrivateKey) error {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+	client.public = public
+	client.private = private
+	account, err := client.public.ToString()
+	if err != nil {
+		client.public = nil
+		client.private = nil
+		return err
+	}
+	client.account = account
+	return nil
+}
+
+func (client *Client) GetBalance(account string) float64 {
+	return client.ledger.GetBalance(account)
+}
+
+func (client *Client) GetAccount() string {
+	return client.account
+}
+
+func (client *Client) GetPort() string {
+	return strconv.Itoa(client.node.GetAddr().(*net.TCPAddr).Port)
+}
+
+func (client *Client) Connect(addr net.Addr) error {
+	return client.node.Connect(addr)
+}
+
+func (client *Client) Close() []error {
+	return client.node.Close()
 }

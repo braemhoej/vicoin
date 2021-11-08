@@ -29,3 +29,7 @@ func (mock *MockNode) SendTransaction(transaction account.SignedTransaction) {
 	defer mock.lock.Unlock()
 	mock.sent = append(mock.sent, &transaction)
 }
+
+func (mock *MockNode) GetAddr() net.Addr {
+	return &net.TCPAddr{}
+}

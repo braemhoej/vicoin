@@ -61,6 +61,10 @@ func (node *Node) GetPeers() []Peer {
 	return node.peers
 }
 
+func (node *Node) GetAddr() net.Addr {
+	return node.socket.GetAddr()
+}
+
 func (node *Node) handle() {
 	for {
 		msg := <-node.internal
