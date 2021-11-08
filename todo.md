@@ -3,14 +3,17 @@
 ### Todo
 
 - [ ] Add testing for strengthening of network #test
-- [ ] Strengthen crypto
-    - [ ] Ensure keys are padded
-    - [ ] Introduce the use of nonces
+- [ ] Implement total-order transaction delivery
+    - [ ] Initial node takes role of sequencer, generating a special key-pair.
+    - [ ] New nodes are informed of who is the sequencer (Add to peer reply ?)
+
 
 ### In Progress
 
-- [ ] Create client structure #feat
+- [x] Create client structure #feat
     - [ ] Handle errors when performing transactions
+- [ ] Strengthen crypto
+    - [ ] Implement probalistic signature scheme for signing/validating
 
 ### Done ✓
 
