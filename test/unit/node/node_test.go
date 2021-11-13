@@ -76,6 +76,27 @@ func TestNodesSendPeerReplyUponRequest(t *testing.T) {
 	}
 }
 
+func TestNewNodesMergePeerRequestIntoKnownPeers(t *testing.T) {
+	internal := make(chan interface{})
+	external := make(chan account.SignedTransaction)
+	mock := NewPolysocketMock(internal)
+	n, _ := node.NewNode(mock, internal, external)
+	for i := 1; i < 10; i++ {
+		mock.InjectMessage(network.Packet{
+			Instruction: network.ConnAnnouncment,
+			Data: node.Peer{
+				Addr: &net.IPAddr{
+					IP: []byte("mock" + strconv.Itoa(i)),
+				},
+			},
+		})
+	}
+	peers := n.GetPeers()
+	if len(peers) != 10 {
+		t.Errorf("Unexpected number of peers %d, want 10", len(peers))
+	}
+}
+
 func TestNodesBroadcastConnectionAnnouncementUponConnection(t *testing.T) {
 	internal := make(chan interface{})
 	external := make(chan account.SignedTransaction)
