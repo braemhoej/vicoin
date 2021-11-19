@@ -9,24 +9,24 @@ import (
 	mocks "vicoin/test/mocks/network"
 )
 
-func makeMockDependencies() (chan interface{}, *mocks.MockDialer, *mocks.MockListener) {
+func makeMockDependencies() (*mocks.MockDialer, *mocks.MockListener) {
 	dialer := mocks.NewMockDialer()
 	listener := mocks.NewMockListener()
-	return make(chan interface{}), dialer, listener
+	return dialer, listener
 }
 
 func TestPolysocketsAreInitialisedWithZeroConnections(t *testing.T) {
-	channel, dialer, listener := makeMockDependencies()
-	poly := network.NewPolysocket(channel, dialer, listener)
+	dialer, listener := makeMockDependencies()
+	poly, _ := network.NewPolysocket(dialer, listener, 10)
 	if len(poly.GetConnections()) != 0 {
 		t.Errorf("Unexpected # of connections %d, want 0", len(poly.GetConnections()))
 	}
 }
 func TestPolysocketsAddConnectionsToListUponDialing(t *testing.T) {
 	local, _ := net.Pipe()
-	channel, dialer, listener := makeMockDependencies()
+	dialer, listener := makeMockDependencies()
+	poly, _ := network.NewPolysocket(dialer, listener, 10)
 	dialer.SetNextSocket(local)
-	poly := network.NewPolysocket(channel, dialer, listener)
 	poly.Connect(&net.TCPAddr{})
 	if len(poly.GetConnections()) != 1 {
 		t.Errorf("Unexpected # of connections %d, want 1", len(poly.GetConnections()))
@@ -35,8 +35,8 @@ func TestPolysocketsAddConnectionsToListUponDialing(t *testing.T) {
 
 func TestPolysocketsAddConnectionsToListUponReceivingConnection(t *testing.T) {
 	local, _ := net.Pipe()
-	channel, dialer, listener := makeMockDependencies()
-	poly := network.NewPolysocket(channel, dialer, listener)
+	dialer, listener := makeMockDependencies()
+	poly, _ := network.NewPolysocket(dialer, listener, 10)
 	listener.SetNextSocket(local)
 	time.Sleep(5 * time.Millisecond)
 	if len(poly.GetConnections()) != 1 {
@@ -46,8 +46,8 @@ func TestPolysocketsAddConnectionsToListUponReceivingConnection(t *testing.T) {
 
 func TestPolysocketsRemoveConnectionsUponRemoteDisconnection(t *testing.T) {
 	local, remote := net.Pipe()
-	channel, dialer, listener := makeMockDependencies()
-	poly := network.NewPolysocket(channel, dialer, listener)
+	dialer, listener := makeMockDependencies()
+	poly, _ := network.NewPolysocket(dialer, listener, 10)
 	listener.SetNextSocket(local)
 	remote.Close()
 	time.Sleep(5 * time.Millisecond)
@@ -58,8 +58,8 @@ func TestPolysocketsRemoveConnectionsUponRemoteDisconnection(t *testing.T) {
 
 func TestPolysocketsPurgeConnectionsUponLocalDisconnection(t *testing.T) {
 	local, _ := net.Pipe()
-	channel, dialer, listener := makeMockDependencies()
-	poly := network.NewPolysocket(channel, dialer, listener)
+	dialer, listener := makeMockDependencies()
+	poly, _ := network.NewPolysocket(dialer, listener, 10)
 	listener.SetNextSocket(local)
 	time.Sleep(5 * time.Millisecond)
 	poly.Close()
@@ -70,8 +70,8 @@ func TestPolysocketsPurgeConnectionsUponLocalDisconnection(t *testing.T) {
 
 func TestPolysocketsDeliverReceivedMessagesOnChannel(t *testing.T) {
 	local, remote := net.Pipe()
-	channel, dialer, listener := makeMockDependencies()
-	network.NewPolysocket(channel, dialer, listener)
+	dialer, listener := makeMockDependencies()
+	_, channel := network.NewPolysocket(dialer, listener, 10)
 	listener.SetNextSocket(local)
 	time.Sleep(5 * time.Millisecond)
 	enc := gob.NewEncoder(remote)

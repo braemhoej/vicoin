@@ -14,22 +14,24 @@ type Polysocket struct {
 	dialer      DialerStrategy
 	connections map[string]net.Conn
 	addr        net.Addr
-	channel     chan interface{}
+	outgoing    chan interface{}
+	close       chan bool
 	lock        sync.Mutex
 }
 
-func NewPolysocket(internal chan interface{}, dialerStrategy DialerStrategy, listenerStrategy ListenerStrategy) (polysocket *Polysocket) {
+func NewPolysocket(dialerStrategy DialerStrategy, listenerStrategy ListenerStrategy, outgoingBuffer int) (polysocket *Polysocket, outgoing chan interface{}) {
 	polysocket = &Polysocket{
 		listener:    listenerStrategy,
 		dialer:      dialerStrategy,
 		connections: make(map[string]net.Conn),
 		addr:        nil,
-		channel:     internal,
+		outgoing:    make(chan interface{}, outgoingBuffer),
+		close:       make(chan bool, 1),
 		lock:        sync.Mutex{},
 	}
 	polysocket.addr = polysocket.listener.Addr()
 	go polysocket.listen()
-	return polysocket
+	return polysocket, polysocket.outgoing
 }
 
 func (polysocket *Polysocket) Connect(addr net.Addr) (net.Conn, error) {
@@ -47,6 +49,7 @@ func (polysocket *Polysocket) Connect(addr net.Addr) (net.Conn, error) {
 func (polysocket *Polysocket) Close() []error {
 	polysocket.lock.Lock()
 	defer polysocket.lock.Unlock()
+	polysocket.close <- true
 	var errors []error
 	for _, socket := range polysocket.connections {
 		err := socket.Close()
@@ -87,48 +90,60 @@ func (polysocket *Polysocket) Send(data interface{}, addr net.Addr) error {
 	return nil
 }
 
-func (polysocket *Polysocket) GetConnections() map[string]net.Conn {
-	polysocket.lock.Lock()
-	defer polysocket.lock.Unlock()
-	return polysocket.connections
-}
-
 func (polysocket *Polysocket) GetAddr() net.Addr {
 	return polysocket.addr
+}
+
+func (polysocket *Polysocket) GetConnections() map[string]net.Conn {
+	return polysocket.connections
 }
 
 // Internal
 func (polysocket *Polysocket) listen() {
 	for {
-		socket, err := polysocket.listener.Accept()
-		if err != nil {
-			log.Println("Incoming net.Conn dropped: ", err)
+		select {
+		case <-polysocket.close:
+			return
+		default:
+			socket, err := polysocket.listener.Accept()
+			if err != nil {
+				log.Println("Incoming net.Conn dropped: ", err)
+			}
+			log.Println("Incoming net.Conn accepted: ", socket.RemoteAddr().String())
+			polysocket.lock.Lock()
+			go polysocket.handle(socket)
+			polysocket.connections[socket.RemoteAddr().String()] = socket
+			polysocket.lock.Unlock()
 		}
-		log.Println("Incoming net.Conn accepted: ", socket.RemoteAddr().String())
-		polysocket.lock.Lock()
-		go polysocket.handle(socket)
-		polysocket.connections[socket.RemoteAddr().String()] = socket
-		polysocket.lock.Unlock()
 	}
 }
 
 func (polysocket *Polysocket) handle(socket net.Conn) {
-	defer socket.Close()
+	// defer socket.Close()
+	for {
+		select {
+		case <-polysocket.close:
+			return
+		default:
+			packet, err := polysocket.read(socket)
+			if err == io.EOF {
+				log.Println("net.Conn closed by " + socket.RemoteAddr().String())
+				polysocket.lock.Lock()
+				delete(polysocket.connections, socket.RemoteAddr().String())
+				polysocket.lock.Unlock()
+				return
+			} else if err != nil {
+				log.Println("Error when decoding connection: ", err.Error())
+			} else if packet != nil {
+				polysocket.outgoing <- packet
+			}
+		}
+	}
+}
+
+func (polysocket *Polysocket) read(socket net.Conn) (interface{}, error) {
 	var buffer interface{}
 	dec := gob.NewDecoder(socket)
-	for {
-		err := dec.Decode(&buffer)
-		if err == io.EOF {
-			log.Println("net.Conn closed by " + socket.RemoteAddr().String())
-			polysocket.lock.Lock()
-			delete(polysocket.connections, socket.RemoteAddr().String())
-			polysocket.lock.Unlock()
-			return
-		}
-		if err != nil {
-			log.Println("Error when decoding: ", err.Error())
-			break
-		}
-		polysocket.channel <- buffer
-	}
+	err := dec.Decode(&buffer)
+	return buffer, err
 }
