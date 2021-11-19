@@ -46,7 +46,7 @@ func (node *Node) Connect(peer *Peer) error {
 	}
 	node.socket.Send(peerRequest, conn.RemoteAddr())
 	connAnnouncemet := network.Packet{
-		Instruction: network.ConnAnnouncment,
+		Instruction: network.ConnAnn,
 		Data:        node.socket.GetAddr(),
 	}
 	node.socket.Broadcast(connAnnouncemet)
@@ -90,7 +90,7 @@ func (node *Node) handle() {
 				node.peers = merge(peers, node.peers)
 				node.lock.Unlock()
 				node.strengthenNetwork()
-			case network.ConnAnnouncment:
+			case network.ConnAnn:
 				peer := packet.Data.(Peer)
 				node.lock.Lock()
 				node.peers = append(node.peers, peer)

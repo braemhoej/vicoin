@@ -1,6 +1,7 @@
 package account
 
 import (
+	"encoding/base64"
 	"vicoin/crypto"
 )
 
@@ -35,7 +36,7 @@ func NewSignedTransaction(id string, from string, to string, amount float64, key
 		From:      from,
 		To:        to,
 		Amount:    amount,
-		Signature: string(signature),
+		Signature: base64.StdEncoding.EncodeToString(signature),
 	}, nil
 }
 func (signedTransaction *SignedTransaction) Validate(key *crypto.PublicKey) (isValid bool, err error) {
@@ -45,7 +46,11 @@ func (signedTransaction *SignedTransaction) Validate(key *crypto.PublicKey) (isV
 		To:     signedTransaction.To,
 		Amount: signedTransaction.Amount,
 	}
-	isValid, err = crypto.Validate(unsignedTransaction, []byte(signedTransaction.Signature), key)
+	bytes, err := base64.StdEncoding.DecodeString(signedTransaction.Signature)
+	if err != nil {
+		return false, err
+	}
+	isValid, err = crypto.Validate(unsignedTransaction, bytes, key)
 	if err != nil {
 		return false, err
 	}

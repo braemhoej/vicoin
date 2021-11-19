@@ -7,7 +7,7 @@ import (
 	"time"
 	"vicoin/account"
 	"vicoin/network"
-	node "vicoin/network/node"
+	"vicoin/node"
 	mocks "vicoin/test/mocks/network"
 )
 
@@ -83,7 +83,7 @@ func TestNewNodesMergePeerRequestIntoKnownPeers(t *testing.T) {
 	n, _ := node.NewNode(mock, internal, external)
 	for i := 1; i < 10; i++ {
 		mock.InjectMessage(network.Packet{
-			Instruction: network.ConnAnnouncment,
+			Instruction: network.ConnAnn,
 			Data: node.Peer{
 				Addr: &net.IPAddr{
 					IP: []byte("mock" + strconv.Itoa(i)),
@@ -108,7 +108,7 @@ func TestNodesBroadcastConnectionAnnouncementUponConnection(t *testing.T) {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
 	msg := mock.BroadcastedMessages[0].(network.Packet)
-	if msg.Instruction != network.ConnAnnouncment {
+	if msg.Instruction != network.ConnAnn {
 		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
 	}
 }
@@ -119,7 +119,7 @@ func TestNewNodesAddAnnouncedConnectionsToPeerList(t *testing.T) {
 	n, _ := node.NewNode(mock, internal, external)
 	for i := 1; i < 10; i++ {
 		mock.InjectMessage(network.Packet{
-			Instruction: network.ConnAnnouncment,
+			Instruction: network.ConnAnn,
 			Data: node.Peer{
 				Addr: &net.IPAddr{
 					IP: []byte("mock" + strconv.Itoa(i)),
@@ -138,13 +138,13 @@ func TestNodesPropagateConnectionAnnouncements(t *testing.T) {
 	mock := NewPolysocketMock(internal)
 	n, _ := node.NewNode(mock, internal, external)
 	n.Connect(&node.Peer{}) // Mock address
-	mock.InjectMessage(network.Packet{Instruction: network.ConnAnnouncment, Data: node.Peer{}})
+	mock.InjectMessage(network.Packet{Instruction: network.ConnAnn, Data: node.Peer{}})
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.BroadcastedMessages) != 2 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
 	msg := mock.BroadcastedMessages[1].(network.Packet)
-	if msg.Instruction != network.ConnAnnouncment {
+	if msg.Instruction != network.ConnAnn {
 		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
 	}
 }

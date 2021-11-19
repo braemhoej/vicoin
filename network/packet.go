@@ -3,10 +3,11 @@ package network
 type Insn int8
 
 const (
-	PeerRequest     Insn = 0x00
-	PeerReply       Insn = 0x01
-	ConnAnnouncment Insn = 0x02
-	Transaction     Insn = 0x03
+	PeerRequest Insn = 0x00
+	PeerReply   Insn = 0x01
+	ConnAnn     Insn = 0x02
+	DissAnn     Insn = 0x03
+	Transaction Insn = 0x04
 )
 
 type Packet struct {
