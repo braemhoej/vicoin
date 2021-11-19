@@ -34,9 +34,9 @@ func NewNode(polysocket network.Socket, internalChannel chan interface{}, extern
 	return node, nil
 }
 
-func (node *Node) Connect(addr net.Addr) error {
+func (node *Node) Connect(peer *Peer) error {
 	go node.handle()
-	conn, err := node.socket.Connect(addr)
+	conn, err := node.socket.Connect(peer.Addr)
 	if err != nil {
 		return err
 	}

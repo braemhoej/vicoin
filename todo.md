@@ -11,7 +11,7 @@
 ### In Progress
 
 - [x] Create client structure #feat
-    - [ ] Handle errors when performing transactions
+- [ ] Create API using JSON-RPC protocol.
 - [ ] Strengthen crypto
     - [ ] Implement probalistic signature scheme for signing/validating
 

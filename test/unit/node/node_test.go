@@ -7,7 +7,7 @@ import (
 	"time"
 	"vicoin/account"
 	"vicoin/network"
-	"vicoin/node"
+	node "vicoin/network/node"
 	mocks "vicoin/test/mocks/network"
 )
 
@@ -46,8 +46,8 @@ func TestNewNodesSendPeerRequestUponConnection(t *testing.T) {
 	internal := make(chan interface{})
 	external := make(chan account.SignedTransaction)
 	mock := NewPolysocketMock(internal)
-	node, _ := node.NewNode(mock, internal, external)
-	node.Connect(&net.TCPAddr{}) // Mock address
+	n, _ := node.NewNode(mock, internal, external)
+	n.Connect(&node.Peer{}) // Mock address
 	if len(mock.SentMessages) != 1 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
@@ -101,8 +101,8 @@ func TestNodesBroadcastConnectionAnnouncementUponConnection(t *testing.T) {
 	internal := make(chan interface{})
 	external := make(chan account.SignedTransaction)
 	mock := NewPolysocketMock(internal)
-	node, _ := node.NewNode(mock, internal, external)
-	node.Connect(&net.TCPAddr{}) // Mock address
+	n, _ := node.NewNode(mock, internal, external)
+	n.Connect(&node.Peer{}) // Mock address
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.BroadcastedMessages) != 1 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
@@ -137,7 +137,7 @@ func TestNodesPropagateConnectionAnnouncements(t *testing.T) {
 	external := make(chan account.SignedTransaction)
 	mock := NewPolysocketMock(internal)
 	n, _ := node.NewNode(mock, internal, external)
-	n.Connect(&net.TCPAddr{}) // Mock address
+	n.Connect(&node.Peer{}) // Mock address
 	mock.InjectMessage(network.Packet{Instruction: network.ConnAnnouncment, Data: node.Peer{}})
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.BroadcastedMessages) != 2 {
@@ -153,8 +153,8 @@ func TestNodesSendSignedTransactionsOnChannel(t *testing.T) {
 	internal := make(chan interface{})
 	external := make(chan account.SignedTransaction)
 	mock := NewPolysocketMock(internal)
-	node, _ := node.NewNode(mock, internal, external)
-	node.Connect(&net.TCPAddr{}) // Mock address
+	n, _ := node.NewNode(mock, internal, external)
+	n.Connect(&node.Peer{}) // Mock address
 	mock.InjectMessage(network.Packet{Instruction: network.Transaction, Data: account.SignedTransaction{}})
 	time.Sleep(50 * time.Millisecond)
 	<-external
@@ -165,7 +165,7 @@ func TestNodesPropagateTransactions(t *testing.T) {
 	external := make(chan account.SignedTransaction)
 	mock := NewPolysocketMock(internal)
 	n, _ := node.NewNode(mock, internal, external)
-	n.Connect(&net.TCPAddr{}) // Mock address
+	n.Connect(&node.Peer{}) // Mock address
 	mock.InjectMessage(network.Packet{Instruction: network.Transaction, Data: account.SignedTransaction{}})
 	time.Sleep(50 * time.Millisecond)
 	<-external
