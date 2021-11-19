@@ -119,7 +119,7 @@ func (polysocket *Polysocket) listen() {
 }
 
 func (polysocket *Polysocket) handle(socket net.Conn) {
-	// defer socket.Close()
+	defer socket.Close()
 	for {
 		select {
 		case <-polysocket.close:
