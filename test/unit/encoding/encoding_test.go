@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"reflect"
 	"testing"
-	"vicoin/internal/encoding"
+	"vicoin/encoding"
 )
 
 func TestObjectSerializationDeserializationEqualsOriginal(t *testing.T) {

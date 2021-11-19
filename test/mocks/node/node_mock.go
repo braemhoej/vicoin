@@ -3,7 +3,7 @@ package mocks
 import (
 	"net"
 	"sync"
-	"vicoin/internal/account"
+	"vicoin/account"
 )
 
 type MockNode struct {

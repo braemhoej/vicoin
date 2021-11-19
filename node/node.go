@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
-	"vicoin/internal/account"
+	"vicoin/account"
 	"vicoin/network"
 )
 

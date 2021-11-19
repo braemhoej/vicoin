@@ -2,9 +2,9 @@ package account_test
 
 import (
 	"testing"
+	"vicoin/account"
 	"vicoin/crypto"
-	"vicoin/internal/account"
-	"vicoin/internal/registration"
+	"vicoin/registration"
 )
 
 func TestLedgersCanSetAndGetAccountBalance(t *testing.T) {

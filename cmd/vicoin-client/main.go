@@ -11,12 +11,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"vicoin/account"
+	"vicoin/client"
 	"vicoin/crypto"
-	"vicoin/internal/account"
-	"vicoin/internal/client"
-	"vicoin/internal/node"
-	"vicoin/internal/registration"
 	"vicoin/network"
+	"vicoin/node"
+	"vicoin/registration"
 )
 
 func getExternalIP() string {

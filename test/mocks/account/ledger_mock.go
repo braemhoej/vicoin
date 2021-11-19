@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"sync"
-	"vicoin/internal/account"
+	"vicoin/account"
 )
 
 type MockLedger struct {

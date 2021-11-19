@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	"vicoin/internal/account"
-	"vicoin/internal/node"
+	"vicoin/account"
 	"vicoin/network"
+	"vicoin/node"
 	mocks "vicoin/test/mocks/network"
 )
 

@@ -2,7 +2,7 @@ package node
 
 import (
 	"net"
-	"vicoin/internal/account"
+	"vicoin/account"
 )
 
 type NodeInterface interface {

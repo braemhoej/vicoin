@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 	"reflect"
-	"vicoin/internal/encoding"
+	"vicoin/encoding"
 )
 
 var one = big.NewInt(1)

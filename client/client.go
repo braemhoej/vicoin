@@ -6,9 +6,9 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"vicoin/account"
 	"vicoin/crypto"
-	"vicoin/internal/account"
-	"vicoin/internal/node"
+	"vicoin/node"
 )
 
 type Client struct {

@@ -2,10 +2,10 @@ package client_test
 
 import (
 	"testing"
+	"vicoin/account"
+	"vicoin/client"
 	"vicoin/crypto"
-	"vicoin/internal/account"
-	"vicoin/internal/client"
-	"vicoin/internal/registration"
+	"vicoin/registration"
 	mocksAcc "vicoin/test/mocks/account"
 	mocksNode "vicoin/test/mocks/node"
 )
