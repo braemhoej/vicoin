@@ -125,10 +125,16 @@ func (node *Node) handleUndelivered(undeliveredPackets []Packet) []Packet {
 	}
 }
 
+// Checks is a packet is malformed. Returns true if the type of the data is
+// not as expected given the instruction, or if the attatched vector clock is
+// nil.
 func isMalformed(packet Packet) bool {
 	return false // TODO: Implement!
 }
 
+// Checks, if given the maintained vector clock, the packet is deliverable.
+// Returns true if the vector clock attatched to the packet indicates that all
+// previous messages have been delivered.
 func deliverable(packet Packet) bool {
 	return true // TODO: Implement!
 }
