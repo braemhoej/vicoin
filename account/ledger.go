@@ -1,10 +1,19 @@
 package account
 
 import (
+	"encoding/json"
 	"errors"
+	"log"
+	"os"
 	"sync"
 	"vicoin/crypto"
 )
+
+type account struct {
+	public  string
+	private string
+	balance float64
+}
 
 type Ledger struct {
 	accounts map[string]float64
@@ -14,6 +23,10 @@ type Ledger struct {
 func NewLedger() *Ledger {
 	ledger := new(Ledger)
 	ledger.accounts = make(map[string]float64)
+	accounts := readAccountsFromFile()
+	for _, account := range accounts {
+		ledger.accounts[account.public] = account.balance
+	}
 	return ledger
 }
 
@@ -56,4 +69,17 @@ func (ledger *Ledger) SetBalance(account string, amount float64) {
 	ledger.lock.Lock()
 	defer ledger.lock.Unlock()
 	ledger.accounts[account] = amount
+}
+
+func readAccountsFromFile() []account {
+	data, err := os.ReadFile("/workspaces/vicoin/account/accounts.txt")
+	if err != nil {
+		log.Panicln(err)
+	}
+	var accounts []account
+	err = json.Unmarshal(data, &accounts)
+	if err != nil {
+		log.Panicln(err)
+	}
+	return accounts
 }
