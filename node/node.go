@@ -14,18 +14,16 @@ type Node struct {
 	socket          network.Socket
 	messageReceived chan bool
 	incoming        chan interface{}
-	outgoing        chan account.SignedTransaction
 	lock            sync.Mutex
 }
 
-func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
+func NewNode(polysocket network.Socket, internalChannel chan interface{}) (*Node, error) {
 	node := &Node{
 		peers:           make([]Peer, 0),
 		history:         make(map[network.Packet]bool),
 		socket:          polysocket,
 		messageReceived: make(chan bool, 1),
 		incoming:        internalChannel,
-		outgoing:        externalChannel,
 		lock:            sync.Mutex{},
 	}
 	self := Peer{
@@ -110,9 +108,9 @@ func (node *Node) handle(packet network.Packet) {
 		node.socket.Broadcast(packet)
 		node.lock.Unlock()
 	case network.Transaction:
-		signedTransaction := packet.Data.(account.SignedTransaction)
+		// signedTransaction := packet.Data.(account.SignedTransaction)
 		node.socket.Broadcast(packet)
-		node.outgoing <- signedTransaction
+		// TODO: Handle transaction
 	}
 }
 
