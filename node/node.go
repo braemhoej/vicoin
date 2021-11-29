@@ -9,22 +9,24 @@ import (
 )
 
 type Node struct {
-	peers    []Peer
-	history  map[network.Packet]bool
-	socket   network.Socket
-	internal chan interface{}
-	external chan account.SignedTransaction
-	lock     sync.Mutex
+	peers           []Peer
+	history         map[network.Packet]bool
+	socket          network.Socket
+	messageReceived chan bool
+	incoming        chan interface{}
+	outgoing        chan account.SignedTransaction
+	lock            sync.Mutex
 }
 
 func NewNode(polysocket network.Socket, internalChannel chan interface{}, externalChannel chan account.SignedTransaction) (*Node, error) {
 	node := &Node{
-		peers:    make([]Peer, 0),
-		history:  make(map[network.Packet]bool),
-		socket:   polysocket,
-		internal: internalChannel,
-		external: externalChannel,
-		lock:     sync.Mutex{},
+		peers:           make([]Peer, 0),
+		history:         make(map[network.Packet]bool),
+		socket:          polysocket,
+		messageReceived: make(chan bool, 1),
+		incoming:        internalChannel,
+		outgoing:        externalChannel,
+		lock:            sync.Mutex{},
 	}
 	self := Peer{
 		Addr: polysocket.GetAddr(),
@@ -70,7 +72,7 @@ func (node *Node) GetAddr() net.Addr {
 // method. Otherwise, skip message.
 func (node *Node) listen() {
 	for {
-		msg := <-node.internal
+		msg := <-node.incoming
 		switch packet := msg.(type) {
 		case network.Packet:
 			node.handle(packet)
@@ -110,7 +112,7 @@ func (node *Node) handle(packet network.Packet) {
 	case network.Transaction:
 		signedTransaction := packet.Data.(account.SignedTransaction)
 		node.socket.Broadcast(packet)
-		node.external <- signedTransaction
+		node.outgoing <- signedTransaction
 	}
 }
 
