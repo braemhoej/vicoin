@@ -11,7 +11,7 @@ import (
 )
 
 func makeDependecies() (*mocks.MockPolysocket, chan interface{}) {
-	internal := make(chan interface{}, 0)
+	internal := make(chan interface{})
 	return &mocks.MockPolysocket{
 		SentMessages:        make([]interface{}, 0),
 		BroadcastedMessages: make([]interface{}, 0),
