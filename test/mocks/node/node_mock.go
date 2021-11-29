@@ -21,9 +21,11 @@ func NewMockNode() *MockNode {
 func (mock *MockNode) Connect(addr net.Addr) error {
 	return nil
 }
+
 func (mock *MockNode) Close() []error {
 	return nil
 }
+
 func (mock *MockNode) SendTransaction(transaction account.SignedTransaction) {
 	mock.lock.Lock()
 	defer mock.lock.Unlock()

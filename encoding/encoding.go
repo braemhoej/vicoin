@@ -15,6 +15,7 @@ func Serialize(object interface{}) ([]byte, error) {
 	}
 	return buffer.Bytes(), nil
 }
+
 func Deserialize(data []byte) (interface{}, error) {
 	buffer := bytes.NewBuffer(data)
 	dec := gob.NewDecoder(buffer)
@@ -34,6 +35,7 @@ func ToB64(object interface{}) (string, error) {
 	b64String := base64.StdEncoding.EncodeToString(serializedObject)
 	return b64String, nil
 }
+
 func FromB64(b64String string) (interface{}, error) {
 	serializedObject, err := base64.StdEncoding.DecodeString(b64String)
 	if err != nil {

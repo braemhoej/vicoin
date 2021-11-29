@@ -14,6 +14,7 @@ type PrivateKey struct {
 func (privateKey *PrivateKey) ToString() (string, error) {
 	return encoding.ToB64(privateKey)
 }
+
 func (privateKey *PrivateKey) FromString(str string) (*PrivateKey, error) {
 	encodedKey, err := encoding.FromB64(str)
 	if err != nil {
@@ -36,6 +37,7 @@ type PublicKey struct {
 func (publicKey *PublicKey) ToString() (string, error) {
 	return encoding.ToB64(publicKey)
 }
+
 func (publicKey *PublicKey) FromString(str string) (*PublicKey, error) {
 	encodedKey, err := encoding.FromB64(str)
 	if err != nil {

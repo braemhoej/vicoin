@@ -39,6 +39,7 @@ func NewSignedTransaction(id string, from string, to string, amount float64, key
 		Signature: base64.StdEncoding.EncodeToString(signature),
 	}, nil
 }
+
 func (signedTransaction *SignedTransaction) Validate(key *crypto.PublicKey) (isValid bool, err error) {
 	unsignedTransaction := Transaction{
 		ID:     signedTransaction.ID,
