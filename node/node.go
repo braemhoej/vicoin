@@ -64,6 +64,10 @@ func (node *Node) GetAddr() net.Addr {
 	return node.socket.GetAddr()
 }
 
+// Listen for messages received on the internal channel.
+// Attempt to typecast said messages to network.Packet. If
+// succesful, pass the packet along to the message handling
+// method. Otherwise, skip message.
 func (node *Node) listen() {
 	for {
 		msg := <-node.internal
@@ -77,6 +81,8 @@ func (node *Node) listen() {
 	}
 }
 
+// Decodes and handles the passed network.Packet.
+// Assumes passed packet is deliverable.
 func (node *Node) handle(packet network.Packet) {
 	switch packet.Instruction {
 	// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
