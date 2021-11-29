@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -9,28 +10,29 @@ import (
 )
 
 type Node struct {
-	peers           []Peer
-	history         map[network.Packet]bool
-	socket          network.Socket
-	messageReceived chan bool
-	incoming        chan interface{}
-	lock            sync.Mutex
+	peers    []Peer
+	history  map[account.SignedTransaction]bool
+	socket   network.Socket
+	incoming chan interface{}
+	internal chan Packet
+	lock     sync.Mutex
 }
 
-func NewNode(polysocket network.Socket, internalChannel chan interface{}) (*Node, error) {
+func NewNode(polysocket network.Socket, incomingChannel chan interface{}) (*Node, error) {
 	node := &Node{
-		peers:           make([]Peer, 0),
-		history:         make(map[network.Packet]bool),
-		socket:          polysocket,
-		messageReceived: make(chan bool, 1),
-		incoming:        internalChannel,
-		lock:            sync.Mutex{},
+		peers:    make([]Peer, 0),
+		history:  make(map[account.SignedTransaction]bool),
+		socket:   polysocket,
+		incoming: incomingChannel,
+		internal: make(chan Packet),
+		lock:     sync.Mutex{},
 	}
 	self := Peer{
 		Addr: polysocket.GetAddr(),
 	}
 	node.peers = append(node.peers, self)
 	go node.listen()
+	go node.handlePackets()
 	return node, nil
 }
 
@@ -39,13 +41,13 @@ func (node *Node) Connect(peer *Peer) error {
 	if err != nil {
 		return err
 	}
-	peerRequest := network.Packet{
-		Instruction: network.PeerRequest,
+	peerRequest := Packet{
+		Instruction: PeerRequest,
 		Data:        conn.LocalAddr(),
 	}
 	node.socket.Send(peerRequest, conn.RemoteAddr())
-	connAnnouncemet := network.Packet{
-		Instruction: network.ConnAnn,
+	connAnnouncemet := Packet{
+		Instruction: ConnAnn,
 		Data:        node.socket.GetAddr(),
 	}
 	node.socket.Broadcast(connAnnouncemet)
@@ -65,15 +67,22 @@ func (node *Node) GetAddr() net.Addr {
 }
 
 // Listen for messages received on the internal channel.
-// Attempt to typecast said messages to network.Packet. If
-// succesful, pass the packet along to the message handling
-// method. Otherwise, skip message.
+// Ensure received message is a packet through type assertion,
+// and ensure that it is not malformed. If succesful, pass the
+// packet along to the message handling method. Otherwise,
+// skip message.
 func (node *Node) listen() {
 	for {
+		fmt.Println("waiting for packaet")
 		msg := <-node.incoming
 		switch packet := msg.(type) {
-		case network.Packet:
-			node.handle(packet)
+		case Packet:
+			if isMalformed(packet) {
+				log.Println("Packet malformed, skipping")
+				continue
+			} else {
+				node.internal <- packet
+			}
 		default:
 			log.Println("Unexpected message type, skipping")
 			continue
@@ -81,52 +90,98 @@ func (node *Node) listen() {
 	}
 }
 
-// Decodes and handles the passed network.Packet.
+// Continuously listen for new packets on the internal channel.
+// When a packet is received, check if it is deliverable. If it
+// is, handle the packet, and handle all other undelivered packets.
+// If it is not, append it to the list of undelivered packets.
+func (node *Node) handlePackets() {
+	undeliveredPackets := make([]Packet, 0)
+	for {
+		packet := <-node.internal
+		fmt.Println("Message received")
+		if deliverable(packet) {
+			node.handle(packet)
+			undeliveredPackets = node.handleUndelivered(undeliveredPackets)
+		} else {
+			undeliveredPackets = append(undeliveredPackets, packet)
+		}
+	}
+}
+
+func (node *Node) handleUndelivered(undeliveredPackets []Packet) []Packet {
+	messageDelivered := false
+	remainingPackets := undeliveredPackets
+	for index, packet := range undeliveredPackets {
+		if deliverable(packet) {
+			node.handle(packet)
+			remainingPackets = append(remainingPackets[0:index-1], remainingPackets[index+1:]...)
+			messageDelivered = true
+		}
+	}
+	if messageDelivered {
+		return node.handleUndelivered(remainingPackets)
+	} else {
+		return remainingPackets
+	}
+}
+
+func isMalformed(packet Packet) bool {
+	return false // TODO: Implement!
+}
+
+func deliverable(packet Packet) bool {
+	return true // TODO: Implement!
+}
+
+// Decodes and handles the passed network.Packet according to the instruction.
 // Assumes passed packet is deliverable.
-func (node *Node) handle(packet network.Packet) {
+func (node *Node) handle(packet Packet) {
 	switch packet.Instruction {
 	// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
-	case network.PeerRequest:
+	case PeerRequest:
 		requester := packet.Data.(net.Addr)
-		node.lock.Lock()
-		reply := network.Packet{
-			Instruction: network.PeerReply,
-			Data:        node.peers,
-		}
-		node.socket.Send(reply, requester)
-		node.lock.Unlock()
-	case network.PeerReply:
+		node.handlePeerRequest(requester)
+	case PeerReply:
 		peers := packet.Data.([]Peer)
-		node.lock.Lock()
-		node.peers = merge(peers, node.peers)
-		node.lock.Unlock()
-		node.strengthenNetwork()
-	case network.ConnAnn:
+		node.handlePeerReply(peers)
+	case ConnAnn:
+		fmt.Println("ConnAnn")
 		peer := packet.Data.(Peer)
-		node.lock.Lock()
-		node.peers = append(node.peers, peer)
-		node.socket.Broadcast(packet)
-		node.lock.Unlock()
-	case network.Transaction:
-		// signedTransaction := packet.Data.(account.SignedTransaction)
-		node.socket.Broadcast(packet)
-		// TODO: Handle transaction
+		node.handleConnectionAnnouncement(peer, packet)
+	case Transaction:
+		fmt.Println("Transaction")
+		signedTransaction := packet.Data.(account.SignedTransaction)
+		node.handleTransaction(signedTransaction, packet)
+	default:
+		log.Printf("Unknown instruction %d \n", packet.Instruction)
 	}
 }
 
-func (node *Node) SendTransaction(transaction account.SignedTransaction) {
+// Handles a peer request by sending a copy of this nodes peers
+// to the address given as argument. Returns a error if no connection is
+// established to the given address.
+func (node *Node) handlePeerRequest(requester net.Addr) error {
 	node.lock.Lock()
 	defer node.lock.Unlock()
-	wrappedTransaction := network.Packet{
-		Instruction: network.Transaction,
-		Data:        transaction,
+	reply := Packet{
+		Instruction: PeerReply,
+		Data:        node.peers,
 	}
-	node.socket.Broadcast(wrappedTransaction)
+	return node.socket.Send(reply, requester)
 }
 
-func (node *Node) strengthenNetwork() {
+// Handles a peer reply by merging the received list of peers with the
+// the list of known peers maintained by the node. Strengthens the network
+// by connecting to the last ten peers in the merged list.
+func (node *Node) handlePeerReply(peers []Peer) {
 	node.lock.Lock()
 	defer node.lock.Unlock()
+	for _, addr := range peers {
+		if !contains(node.peers, addr) {
+			node.peers = append(node.peers, addr)
+		}
+	}
+	// Strengthen network TODO: Insert check if # connections is below some value, i.e. 10.
 	index := len(node.peers)
 	if len(node.peers) > 11 {
 		index = 11
@@ -136,6 +191,35 @@ func (node *Node) strengthenNetwork() {
 	}
 }
 
+// Handles a connection announcement by appending the received peer to
+// the list of peers maintained by the node. Then propagate the announcenent
+// by broadcasting the received packet to all open connections.
+func (node *Node) handleConnectionAnnouncement(peer Peer, packet Packet) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	node.peers = append(node.peers, peer) //TODO: Ensure that known peers are not re-added.
+	node.socket.Broadcast(packet)         //TODO: Strengthen network if # connections below some threshold.
+}
+
+// Handle a transaction by attempting to update the ledger. Then propagate the
+// transaction by broadcasting the received packet to all open connections.
+func (node *Node) handleTransaction(transaction account.SignedTransaction, packet Packet) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	// TODO: Handle transaction
+	node.socket.Broadcast(packet)
+}
+
+func (node *Node) SendTransaction(transaction account.SignedTransaction) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
+	wrappedTransaction := Packet{
+		Instruction: Transaction,
+		Data:        transaction,
+	}
+	node.socket.Broadcast(wrappedTransaction)
+}
+
 func contains(list []Peer, peer Peer) bool {
 	for _, known := range list {
 		if known == peer {
@@ -143,14 +227,4 @@ func contains(list []Peer, peer Peer) bool {
 		}
 	}
 	return false
-}
-
-func merge(received []Peer, known []Peer) []Peer {
-	output := known
-	for _, addr := range received {
-		if !contains(output, addr) {
-			output = append(output, addr)
-		}
-	}
-	return output
 }

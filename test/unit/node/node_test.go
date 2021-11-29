@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 	"vicoin/account"
-	"vicoin/network"
 	"vicoin/node"
 	mocks "vicoin/test/mocks/network"
 )
 
 func makeDependecies() (*mocks.MockPolysocket, chan interface{}) {
-	internal := make(chan interface{})
+	internal := make(chan interface{}, 0)
 	return &mocks.MockPolysocket{
 		SentMessages:        make([]interface{}, 0),
 		BroadcastedMessages: make([]interface{}, 0),
@@ -46,8 +45,8 @@ func TestNewNodesSendPeerRequestUponConnection(t *testing.T) {
 	if len(mock.SentMessages) != 1 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
-	msg := mock.SentMessages[0].(network.Packet)
-	if msg.Instruction != network.PeerRequest {
+	msg := mock.SentMessages[0].(node.Packet)
+	if msg.Instruction != node.PeerRequest {
 		t.Errorf("Unexpected instruction %d, want 0", msg.Instruction)
 	}
 }
@@ -55,16 +54,16 @@ func TestNewNodesSendPeerRequestUponConnection(t *testing.T) {
 func TestNodesSendPeerReplyUponRequest(t *testing.T) {
 	mock, internal := makeDependecies()
 	node.NewNode(mock, internal)
-	mock.InjectMessage(network.Packet{
-		Instruction: network.PeerRequest,
+	mock.InjectMessage(node.Packet{
+		Instruction: node.PeerRequest,
 		Data:        &net.TCPAddr{},
 	})
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.SentMessages) != 1 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
-	msg := mock.SentMessages[0].(network.Packet)
-	if msg.Instruction != network.PeerReply {
+	msg := mock.SentMessages[0].(node.Packet)
+	if msg.Instruction != node.PeerReply {
 		t.Errorf("Unexpected instruction %d, want 1", msg.Instruction)
 	}
 }
@@ -73,8 +72,8 @@ func TestNewNodesMergePeerRequestIntoKnownPeers(t *testing.T) {
 	mock, internal := makeDependecies()
 	n, _ := node.NewNode(mock, internal)
 	for i := 1; i < 10; i++ {
-		mock.InjectMessage(network.Packet{
-			Instruction: network.ConnAnn,
+		mock.InjectMessage(node.Packet{
+			Instruction: node.ConnAnn,
 			Data: node.Peer{
 				Addr: &net.IPAddr{
 					IP: []byte("mock" + strconv.Itoa(i)),
@@ -82,7 +81,9 @@ func TestNewNodesMergePeerRequestIntoKnownPeers(t *testing.T) {
 			},
 		})
 	}
+	time.Sleep(60 * time.Millisecond)
 	peers := n.GetPeers()
+
 	if len(peers) != 10 {
 		t.Errorf("Unexpected number of peers %d, want 10", len(peers))
 	}
@@ -96,8 +97,8 @@ func TestNodesBroadcastConnectionAnnouncementUponConnection(t *testing.T) {
 	if len(mock.BroadcastedMessages) != 1 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
-	msg := mock.BroadcastedMessages[0].(network.Packet)
-	if msg.Instruction != network.ConnAnn {
+	msg := mock.BroadcastedMessages[0].(node.Packet)
+	if msg.Instruction != node.ConnAnn {
 		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
 	}
 }
@@ -105,8 +106,8 @@ func TestNewNodesAddAnnouncedConnectionsToPeerList(t *testing.T) {
 	mock, internal := makeDependecies()
 	n, _ := node.NewNode(mock, internal)
 	for i := 1; i < 10; i++ {
-		mock.InjectMessage(network.Packet{
-			Instruction: network.ConnAnn,
+		mock.InjectMessage(node.Packet{
+			Instruction: node.ConnAnn,
 			Data: node.Peer{
 				Addr: &net.IPAddr{
 					IP: []byte("mock" + strconv.Itoa(i)),
@@ -114,6 +115,7 @@ func TestNewNodesAddAnnouncedConnectionsToPeerList(t *testing.T) {
 			},
 		})
 	}
+	time.Sleep(50 * time.Millisecond)
 	peers := n.GetPeers()
 	if len(peers) != 10 {
 		t.Errorf("Unexpected number of peers %d, want 10", len(peers))
@@ -123,13 +125,13 @@ func TestNodesPropagateConnectionAnnouncements(t *testing.T) {
 	mock, internal := makeDependecies()
 	n, _ := node.NewNode(mock, internal)
 	n.Connect(&node.Peer{}) // Mock address
-	mock.InjectMessage(network.Packet{Instruction: network.ConnAnn, Data: node.Peer{}})
+	mock.InjectMessage(node.Packet{Instruction: node.ConnAnn, Data: node.Peer{}})
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.BroadcastedMessages) != 2 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
-	msg := mock.BroadcastedMessages[1].(network.Packet)
-	if msg.Instruction != network.ConnAnn {
+	msg := mock.BroadcastedMessages[1].(node.Packet)
+	if msg.Instruction != node.ConnAnn {
 		t.Errorf("Unexpected instruction %d, want 3", msg.Instruction)
 	}
 }
@@ -138,13 +140,13 @@ func TestNodesPropagateTransactions(t *testing.T) {
 	mock, internal := makeDependecies()
 	n, _ := node.NewNode(mock, internal)
 	n.Connect(&node.Peer{}) // Mock address
-	mock.InjectMessage(network.Packet{Instruction: network.Transaction, Data: account.SignedTransaction{}})
+	mock.InjectMessage(node.Packet{Instruction: node.Transaction, Data: account.SignedTransaction{}})
 	time.Sleep(50 * time.Millisecond)
 	if len(mock.BroadcastedMessages) != 2 {
 		t.Errorf("Unexpected number of sent messages %d, want 1", len(mock.SentMessages))
 	}
-	msg := mock.BroadcastedMessages[1].(network.Packet)
-	if msg.Instruction != network.Transaction {
+	msg := mock.BroadcastedMessages[1].(node.Packet)
+	if msg.Instruction != node.Transaction {
 		t.Errorf("Unexpected instruction %d, want 4", msg.Instruction)
 	}
 }
