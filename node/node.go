@@ -30,12 +30,11 @@ func NewNode(polysocket network.Socket, internalChannel chan interface{}, extern
 		Addr: polysocket.GetAddr(),
 	}
 	node.peers = append(node.peers, self)
-	go node.handle()
+	go node.listen()
 	return node, nil
 }
 
 func (node *Node) Connect(peer *Peer) error {
-	go node.handle()
 	conn, err := node.socket.Connect(peer.Addr)
 	if err != nil {
 		return err
@@ -65,46 +64,47 @@ func (node *Node) GetAddr() net.Addr {
 	return node.socket.GetAddr()
 }
 
-func (node *Node) handle() {
+func (node *Node) listen() {
 	for {
 		msg := <-node.internal
 		switch packet := msg.(type) {
 		case network.Packet:
-			if seen := node.history[msg.(network.Packet)]; seen {
-				continue
-			}
-			switch packet.Instruction {
-			// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
-			case network.PeerRequest:
-				requester := packet.Data.(net.Addr)
-				node.lock.Lock()
-				reply := network.Packet{
-					Instruction: network.PeerReply,
-					Data:        node.peers,
-				}
-				node.socket.Send(reply, requester)
-				node.lock.Unlock()
-			case network.PeerReply:
-				peers := packet.Data.([]Peer)
-				node.lock.Lock()
-				node.peers = merge(peers, node.peers)
-				node.lock.Unlock()
-				node.strengthenNetwork()
-			case network.ConnAnn:
-				peer := packet.Data.(Peer)
-				node.lock.Lock()
-				node.peers = append(node.peers, peer)
-				node.socket.Broadcast(msg)
-				node.lock.Unlock()
-			case network.Transaction:
-				signedTransaction := packet.Data.(account.SignedTransaction)
-				node.socket.Broadcast(msg)
-				node.external <- signedTransaction
-			}
+			node.handle(packet)
 		default:
 			log.Println("Unexpected message type, skipping")
 			continue
 		}
+	}
+}
+
+func (node *Node) handle(packet network.Packet) {
+	switch packet.Instruction {
+	// NOTE: Currently vulnerable to malformed packages, i.e. data not of expected type !!!!
+	case network.PeerRequest:
+		requester := packet.Data.(net.Addr)
+		node.lock.Lock()
+		reply := network.Packet{
+			Instruction: network.PeerReply,
+			Data:        node.peers,
+		}
+		node.socket.Send(reply, requester)
+		node.lock.Unlock()
+	case network.PeerReply:
+		peers := packet.Data.([]Peer)
+		node.lock.Lock()
+		node.peers = merge(peers, node.peers)
+		node.lock.Unlock()
+		node.strengthenNetwork()
+	case network.ConnAnn:
+		peer := packet.Data.(Peer)
+		node.lock.Lock()
+		node.peers = append(node.peers, peer)
+		node.socket.Broadcast(packet)
+		node.lock.Unlock()
+	case network.Transaction:
+		signedTransaction := packet.Data.(account.SignedTransaction)
+		node.socket.Broadcast(packet)
+		node.external <- signedTransaction
 	}
 }
 
