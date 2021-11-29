@@ -16,25 +16,3 @@ type Packet struct {
 	Data        interface{}
 	VectorClock VectorClock
 }
-
-type VectorClock struct {
-	vector map[Peer]int
-}
-
-func NewVectorClock() VectorClock {
-	return VectorClock{
-		vector: make(map[Peer]int),
-	}
-}
-
-func (vectorClock *VectorClock) Get(peer Peer) int {
-	return vectorClock.vector[peer]
-}
-
-func (vectorClock *VectorClock) Increment(peer Peer) {
-	vectorClock.vector[peer] += 1
-}
-
-func (vectorClock *VectorClock) Delete(peer Peer) {
-	delete(vectorClock.vector, peer)
-}

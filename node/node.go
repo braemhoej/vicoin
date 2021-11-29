@@ -10,29 +10,33 @@ import (
 )
 
 type Node struct {
-	peers    []Peer
-	history  map[account.SignedTransaction]bool
-	socket   network.Socket
-	incoming chan interface{}
-	internal chan Packet
-	lock     sync.Mutex
+	peers       []Peer
+	history     map[account.SignedTransaction]bool
+	socket      network.Socket
+	incoming    chan interface{}
+	internal    chan Packet
+	vectorClock VectorClock
+	ledger      *account.Ledger
+	lock        sync.Mutex
 }
 
 func NewNode(polysocket network.Socket, incomingChannel chan interface{}) (*Node, error) {
 	node := &Node{
-		peers:    make([]Peer, 0),
-		history:  make(map[account.SignedTransaction]bool),
-		socket:   polysocket,
-		incoming: incomingChannel,
-		internal: make(chan Packet),
-		lock:     sync.Mutex{},
+		peers:       make([]Peer, 0),
+		history:     make(map[account.SignedTransaction]bool),
+		socket:      polysocket,
+		incoming:    incomingChannel,
+		internal:    make(chan Packet),
+		vectorClock: NewVectorClock(),
+		ledger:      account.NewLedger(),
+		lock:        sync.Mutex{},
 	}
 	self := Peer{
 		Addr: polysocket.GetAddr(),
 	}
 	node.peers = append(node.peers, self)
 	go node.listen()
-	go node.handlePackets()
+	go node.handleTransactionPackets()
 	return node, nil
 }
 
@@ -69,11 +73,10 @@ func (node *Node) GetAddr() net.Addr {
 // Listen for messages received on the internal channel.
 // Ensure received message is a packet through type assertion,
 // and ensure that it is not malformed. If succesful, pass the
-// packet along to the message handling method. Otherwise,
+// packet along to the packet handling method. Otherwise,
 // skip message.
 func (node *Node) listen() {
 	for {
-		fmt.Println("waiting for packaet")
 		msg := <-node.incoming
 		switch packet := msg.(type) {
 		case Packet:
@@ -81,7 +84,7 @@ func (node *Node) listen() {
 				log.Println("Packet malformed, skipping")
 				continue
 			} else {
-				node.internal <- packet
+				node.handle(packet)
 			}
 		default:
 			log.Println("Unexpected message type, skipping")
@@ -90,17 +93,18 @@ func (node *Node) listen() {
 	}
 }
 
-// Continuously listen for new packets on the internal channel.
+// Continuously listen for new transaction packets on the internal channel.
 // When a packet is received, check if it is deliverable. If it
 // is, handle the packet, and handle all other undelivered packets.
 // If it is not, append it to the list of undelivered packets.
-func (node *Node) handlePackets() {
+func (node *Node) handleTransactionPackets() {
 	undeliveredPackets := make([]Packet, 0)
 	for {
 		packet := <-node.internal
-		fmt.Println("Message received")
-		if deliverable(packet) {
-			node.handle(packet)
+		if deliverable(packet.VectorClock) {
+			transaction := packet.Data.(account.SignedTransaction)
+			node.vectorClock = Update(node.vectorClock, packet.VectorClock)
+			node.handleTransaction(transaction)
 			undeliveredPackets = node.handleUndelivered(undeliveredPackets)
 		} else {
 			undeliveredPackets = append(undeliveredPackets, packet)
@@ -112,8 +116,9 @@ func (node *Node) handleUndelivered(undeliveredPackets []Packet) []Packet {
 	messageDelivered := false
 	remainingPackets := undeliveredPackets
 	for index, packet := range undeliveredPackets {
-		if deliverable(packet) {
-			node.handle(packet)
+		if deliverable(packet.VectorClock) {
+			transaction := packet.Data.(account.SignedTransaction)
+			node.handleTransaction(transaction)
 			remainingPackets = append(remainingPackets[0:index-1], remainingPackets[index+1:]...)
 			messageDelivered = true
 		}
@@ -135,7 +140,7 @@ func isMalformed(packet Packet) bool {
 // Checks, if given the maintained vector clock, the packet is deliverable.
 // Returns true if the vector clock attatched to the packet indicates that all
 // previous messages have been delivered.
-func deliverable(packet Packet) bool {
+func deliverable(vectorClock VectorClock) bool {
 	return true // TODO: Implement!
 }
 
@@ -156,8 +161,8 @@ func (node *Node) handle(packet Packet) {
 		node.handleConnectionAnnouncement(peer, packet)
 	case Transaction:
 		fmt.Println("Transaction")
-		signedTransaction := packet.Data.(account.SignedTransaction)
-		node.handleTransaction(signedTransaction, packet)
+		node.internal <- packet
+		node.socket.Broadcast(packet)
 	default:
 		log.Printf("Unknown instruction %d \n", packet.Instruction)
 	}
@@ -207,21 +212,29 @@ func (node *Node) handleConnectionAnnouncement(peer Peer, packet Packet) {
 	node.socket.Broadcast(packet)         //TODO: Strengthen network if # connections below some threshold.
 }
 
-// Handle a transaction by attempting to update the ledger. Then propagate the
-// transaction by broadcasting the received packet to all open connections.
-func (node *Node) handleTransaction(transaction account.SignedTransaction, packet Packet) {
+// Handle a transaction by attempting to update the ledger.
+func (node *Node) handleTransaction(transaction account.SignedTransaction) {
 	node.lock.Lock()
 	defer node.lock.Unlock()
-	// TODO: Handle transaction
-	node.socket.Broadcast(packet)
+	err := node.ledger.SignedTransaction(&transaction)
+	if err != nil {
+		log.Println("Error when attempting to perform transaction: ", err)
+	} else {
+		log.Println("Transaction performed successfully")
+	}
 }
 
 func (node *Node) SendTransaction(transaction account.SignedTransaction) {
 	node.lock.Lock()
 	defer node.lock.Unlock()
+	self := Peer{
+		Addr: node.socket.GetAddr(),
+	}
+	node.vectorClock.Increment(self)
 	wrappedTransaction := Packet{
 		Instruction: Transaction,
 		Data:        transaction,
+		VectorClock: node.vectorClock,
 	}
 	node.socket.Broadcast(wrappedTransaction)
 }
