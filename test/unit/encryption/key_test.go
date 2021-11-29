@@ -32,3 +32,18 @@ func TestPrivateKeysCanBeBase64StringEncodedDecoded(t *testing.T) {
 		t.Error("Error keys are unequal", private, privateFromString)
 	}
 }
+
+func TestKeysReturnErrorsWhenDecodingFromNonKeyEncoding(t *testing.T) {
+	gob.Register(crypto.PrivateKey{})
+	privateString := "private.ToString()"
+	gob.Register(crypto.PublicKey{})
+	publicString := "public.ToString()"
+	_, err1 := new(crypto.PublicKey).FromString(publicString)
+	_, err2 := new(crypto.PrivateKey).FromString(privateString)
+	if err1 == nil {
+		t.Error("No error when Base64 decoding public key")
+	}
+	if err2 == nil {
+		t.Error("No error when Base64 decoding private key")
+	}
+}
