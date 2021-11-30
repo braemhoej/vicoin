@@ -11,7 +11,6 @@ import (
 
 type account struct {
 	public  string
-	private string
 	balance float64
 }
 
