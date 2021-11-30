@@ -11,8 +11,9 @@ type Block struct {
 }
 
 type SignedBlock struct {
-	Block     Block
-	Signature string
+	SequenceNumber int
+	Transactions   []string
+	Signature      string
 }
 
 func (block *Block) Sign(private *crypto.PrivateKey) (*SignedBlock, error) {
@@ -25,8 +26,9 @@ func (block *Block) Sign(private *crypto.PrivateKey) (*SignedBlock, error) {
 		return nil, err
 	}
 	signedBlock := SignedBlock{
-		Block:     *block,
-		Signature: encodedSignature,
+		SequenceNumber: block.SequenceNumber,
+		Transactions:   block.Transactions,
+		Signature:      encodedSignature,
 	}
 	return &signedBlock, nil
 }
@@ -37,5 +39,9 @@ func (block *SignedBlock) Validate(public *crypto.PublicKey) (bool, error) {
 		return false, err
 	}
 	signature := decodedSignature.([]byte)
-	return crypto.Validate(block.Block, signature, public)
+	unsignedBlock := Block{
+		SequenceNumber: block.SequenceNumber,
+		Transactions:   block.Transactions,
+	}
+	return crypto.Validate(unsignedBlock, signature, public)
 }

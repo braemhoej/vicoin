@@ -10,6 +10,6 @@ type Peer struct {
 }
 
 type PeerData struct {
-	Peers        []Peer
-	SequencerKey crypto.PublicKey
+	Peers        *[]Peer
+	SequencerKey *crypto.PublicKey
 }

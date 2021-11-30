@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -16,26 +17,27 @@ type Node struct {
 	socket             network.Socket
 	incoming           chan interface{}
 	internal           chan account.SignedTransaction
-	ledger             *account.Ledger
+	ledger             account.LedgerInterface
 	sequencer          bool
-	public             crypto.PublicKey
-	private            crypto.PrivateKey
+	public             *crypto.PublicKey
+	private            *crypto.PrivateKey
 	latestBlock        int
 	blockSize          int
 	transactionCounter int
 	lock               sync.Mutex
 }
 
-func NewNode(polysocket network.Socket, incomingChannel chan interface{}) (*Node, error) {
+func NewNode(polysocket network.Socket, incomingChannel chan interface{}, ledger account.LedgerInterface) (*Node, error) {
 	node := &Node{
-		peers:       make([]Peer, 0),
-		history:     make(map[Packet]bool),
-		socket:      polysocket,
-		incoming:    incomingChannel,
-		ledger:      account.NewLedger(),
-		sequencer:   false,
-		latestBlock: 0,
-		lock:        sync.Mutex{},
+		peers:        make([]Peer, 0),
+		history:      make(map[Packet]bool),
+		transactions: make(map[string]account.SignedTransaction),
+		socket:       polysocket,
+		incoming:     incomingChannel,
+		ledger:       ledger,
+		sequencer:    false,
+		latestBlock:  0,
+		lock:         sync.Mutex{},
 	}
 	self := Peer{
 		Addr: polysocket.GetAddr(),
@@ -45,7 +47,7 @@ func NewNode(polysocket network.Socket, incomingChannel chan interface{}) (*Node
 	return node, nil
 }
 
-func (node *Node) Promote(public crypto.PublicKey, private crypto.PrivateKey, blockSize int) {
+func (node *Node) Promote(public *crypto.PublicKey, private *crypto.PrivateKey, blockSize int) {
 	node.sequencer = true
 	node.public = public
 	node.private = private
@@ -80,6 +82,10 @@ func (node *Node) GetPeers() []Peer {
 	return node.peers
 }
 
+func (node *Node) GetSequencerKey() *crypto.PublicKey {
+	return node.public
+}
+
 func (node *Node) GetAddr() net.Addr {
 	return node.socket.GetAddr()
 }
@@ -94,15 +100,23 @@ func (node *Node) listen() {
 		msg := <-node.incoming
 		switch packet := msg.(type) {
 		case Packet:
-			if _, contains := node.history[packet]; contains {
-				log.Println("packet replay, skipping")
-				continue
-			}
 			if isMalformed(packet) {
 				log.Println("packet malformed, skipping")
 				continue
 			}
-			node.history[packet] = true
+			isBlock := packet.Instruction == BlockAnn
+			contains := false
+			if !isBlock {
+				_, found := node.history[packet]
+				contains = found
+				node.history[packet] = contains
+			} else {
+				contains = packet.Data.(SignedBlock).SequenceNumber <= node.latestBlock
+			}
+			if contains {
+				log.Println("packet replay, skipping")
+				continue
+			}
 			node.handle(packet)
 		default:
 			log.Println("unexpected message type, skipping")
@@ -121,6 +135,8 @@ func isMalformed(packet Packet) bool {
 // Decodes and handles the passed network.Packet according to the instruction.
 // Assumes passed packet is deliverable.
 func (node *Node) handle(packet Packet) {
+	node.lock.Lock()
+	defer node.lock.Unlock()
 	switch packet.Instruction {
 	case PeerRequest:
 		requester := packet.Data.(net.Addr)
@@ -146,10 +162,8 @@ func (node *Node) handle(packet Packet) {
 // to the address given as argument. Returns a error if no connection is
 // established to the given address.
 func (node *Node) handlePeerRequest(requester net.Addr) error {
-	node.lock.Lock()
-	defer node.lock.Unlock()
 	data := PeerData{
-		Peers:        node.peers,
+		Peers:        &node.peers,
 		SequencerKey: node.public,
 	}
 	reply := Packet{
@@ -163,10 +177,8 @@ func (node *Node) handlePeerRequest(requester net.Addr) error {
 // the list of known peers maintained by the node. Strengthens the network
 // by connecting to the last ten peers in the merged list.
 func (node *Node) handlePeerReply(data PeerData) {
-	node.lock.Lock()
-	defer node.lock.Unlock()
 	node.public = data.SequencerKey
-	for _, addr := range data.Peers {
+	for _, addr := range *data.Peers {
 		if !contains(node.peers, addr) {
 			node.peers = append(node.peers, addr)
 		}
@@ -185,8 +197,6 @@ func (node *Node) handlePeerReply(data PeerData) {
 // the list of peers maintained by the node. Then propagate the announcenent
 // by broadcasting the received packet to all open connections.
 func (node *Node) handleConnectionAnnouncement(peer Peer, packet Packet) {
-	node.lock.Lock()
-	defer node.lock.Unlock()
 	node.peers = append(node.peers, peer) //TODO: Ensure that known peers are not re-added.
 	node.socket.Broadcast(packet)         //TODO: Strengthen network if # connections below some threshold.
 }
@@ -195,8 +205,7 @@ func (node *Node) handleConnectionAnnouncement(peer Peer, packet Packet) {
 // and produce block once counter reaches blocksize. Wrap block in packet and send on "incoming"
 // channel.
 func (node *Node) handleTransaction(transaction account.SignedTransaction, packet Packet) {
-	node.lock.Lock()
-	defer node.lock.Unlock()
+	node.transactions[transaction.ID] = transaction
 	node.socket.Broadcast(packet)
 	if node.sequencer {
 		node.internal <- transaction
@@ -208,32 +217,39 @@ func (node *Node) handleTransaction(transaction account.SignedTransaction, packe
 			}
 			blockPacket := Packet{
 				Instruction: BlockAnn,
-				Data:        block,
+				Data:        *block,
 			}
-			node.incoming <- blockPacket
+			node.handleBlock(*block, blockPacket)
 			node.transactionCounter = 0
 		}
 	}
 }
 
 func (node *Node) handleBlock(block SignedBlock, packet Packet) {
-	node.lock.Lock()
-	defer node.lock.Unlock()
-	valid, _ := block.Validate(&node.public)
-	isNextBlock := block.Block.SequenceNumber-node.latestBlock == 1
+	fmt.Println("Handling block")
+	fmt.Println("begin validating")
+	valid, _ := block.Validate(node.public)
+	fmt.Println("finished validating")
+	isNextBlock := block.SequenceNumber-node.latestBlock == 1
 	if !valid {
-		log.Println("unable to verify block: ", block.Block.SequenceNumber)
+		log.Println("unable to verify block: ", block.SequenceNumber)
 		return
 	}
+	fmt.Println("block is valid")
 	if !isNextBlock {
-		log.Println("unexpected block sequence number: ", block.Block.SequenceNumber, " expected: ", node.latestBlock+1)
+		log.Println("unexpected block sequence number: ", block.SequenceNumber, " expected: ", node.latestBlock+1)
 		return
 	}
-	for _, id := range block.Block.Transactions {
-		transaction := node.transactions[id]
-		node.ledger.SignedTransaction(&transaction)
+	fmt.Println("block is next")
+	for _, id := range block.Transactions {
+		if transaction, contains := node.transactions[id]; contains {
+			node.ledger.SignedTransaction(&transaction)
+		} else {
+			log.Panicln("transaction not found")
+		}
 	}
 	node.latestBlock++
+	fmt.Println("broadcasting blockpacket!")
 	node.socket.Broadcast(packet)
 }
 
@@ -247,7 +263,7 @@ func (node *Node) produceBlock() (*SignedBlock, error) {
 		SequenceNumber: node.latestBlock + 1,
 		Transactions:   transactions,
 	}
-	signedBlock, err := block.Sign(&node.private)
+	signedBlock, err := block.Sign(node.private)
 	if err != nil {
 		return nil, err
 	}
@@ -255,8 +271,6 @@ func (node *Node) produceBlock() (*SignedBlock, error) {
 }
 
 func (node *Node) SendTransaction(transaction account.SignedTransaction) {
-	node.lock.Lock()
-	defer node.lock.Unlock()
 	wrappedTransaction := Packet{
 		Instruction: Transaction,
 		Data:        transaction,
