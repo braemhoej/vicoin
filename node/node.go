@@ -6,11 +6,13 @@ import (
 	"net"
 	"sync"
 	"vicoin/account"
+	"vicoin/crypto"
 	"vicoin/network"
 )
 
 type Node struct {
 	self         *Peer
+	sequencerKey *crypto.PublicKey
 	peers        []*Peer
 	connections  []*Peer
 	transactions map[account.SignedTransaction]bool
@@ -30,6 +32,7 @@ func NewNode(ledger account.LedgerInterface) (*Node, error) {
 	node := &Node{
 		self:         self,
 		peers:        peers,
+		sequencerKey: nil,
 		connections:  make([]*Peer, 0),
 		transactions: make(map[account.SignedTransaction]bool),
 		ledger:       ledger,
